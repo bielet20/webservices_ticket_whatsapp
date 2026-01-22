@@ -37,9 +37,22 @@ Sistema profesional de gestión de tickets para servicios informáticos con inte
 7. **Programación de Aplicaciones Personalizadas** ⭐
 8. **Desarrollo de Entornos Web** ⭐
 
-## 🐳 Despliegue con Docker (Recomendado)
+## 🐳 Despliegue
 
-### Inicio Rápido
+### Opción 1: Coolify (Recomendado para Producción)
+
+Despliega fácilmente en tu servidor con Coolify:
+
+```bash
+# 1. Conecta tu repo GitHub en Coolify
+# 2. Selecciona Dockerfile.coolify
+# 3. Configura variables de entorno
+# 4. ¡Despliega!
+```
+
+📖 **Guía completa Coolify:** Ver [COOLIFY.md](COOLIFY.md)
+
+### Opción 2: Docker Compose (Local/VPS)
 
 ```bash
 # 1. Configurar credenciales
@@ -54,7 +67,7 @@ cp .env.production .env
 
 La aplicación estará en: **http://localhost:3000**
 
-📖 **Guía completa:** Ver [DOCKER.md](DOCKER.md)
+📖 **Guía completa Docker:** Ver [DOCKER.md](DOCKER.md)
 
 ### Comandos Docker
 

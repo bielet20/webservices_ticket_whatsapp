@@ -1,0 +1,51 @@
+# Dockerfile optimizado para Coolify
+# Sistema de tickets con WhatsApp Web integrado
+
+FROM node:18-alpine
+
+# Instalar Chromium y dependencias necesarias
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    sqlite \
+    curl
+
+# Configurar Puppeteer para usar Chromium del sistema
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    NODE_ENV=production
+
+# Crear usuario no-root
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+WORKDIR /app
+
+# Copiar package files e instalar dependencias
+COPY package*.json ./
+RUN npm ci --only=production && \
+    npm cache clean --force
+
+# Copiar código de la aplicación
+COPY --chown=nodejs:nodejs . .
+
+# Crear directorios necesarios con permisos correctos
+RUN mkdir -p .wwebjs_auth .wwebjs_cache && \
+    chown -R nodejs:nodejs /app
+
+# Cambiar a usuario no-root
+USER nodejs
+
+# Exponer puerto (Coolify detecta automáticamente)
+EXPOSE 3000
+
+# Health check para Coolify
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Comando de inicio
+CMD ["node", "server.js"]

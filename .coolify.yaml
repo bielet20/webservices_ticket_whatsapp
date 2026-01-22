@@ -1,0 +1,30 @@
+# Configuración de Coolify (opcional)
+# Este archivo puede ayudar a Coolify a detectar automáticamente la configuración
+
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.coolify
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      - whatsapp_auth:/app/.wwebjs_auth
+      - app_db:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  whatsapp_auth:
+    driver: local
+  app_db:
+    driver: local
