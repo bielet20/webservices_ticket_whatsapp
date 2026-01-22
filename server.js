@@ -97,7 +97,9 @@ app.post('/api/login', (req, res) => {
     const validPassword = process.env.ADMIN_PASSWORD || 'admin123';
     const isProduction = process.env.NODE_ENV === 'production';
     
-    // Bloquear credenciales por defecto en producción
+    // TEMPORAL: Bloqueo desactivado para configuración inicial
+    // TODO: Reactivar después de configurar variables de entorno en Coolify
+    /*
     if (isProduction && username === 'admin' && password === 'admin123') {
         return res.status(403).json({ 
             success: false, 
@@ -106,6 +108,7 @@ app.post('/api/login', (req, res) => {
             blocked: true
         });
     }
+    */
     
     if (username === validUsername && password === validPassword) {
         req.session.authenticated = true;
