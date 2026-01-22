@@ -398,6 +398,21 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Debug endpoint (solo para verificar configuración)
+app.get('/api/config-check', (req, res) => {
+    const username = process.env.ADMIN_USERNAME || 'admin';
+    const hasPassword = !!(process.env.ADMIN_PASSWORD);
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    res.json({
+        environment: process.env.NODE_ENV || 'development',
+        usernameConfigured: username,
+        passwordConfigured: hasPassword,
+        isProduction: isProduction,
+        defaultBlocked: isProduction && username === 'admin'
+    });
+});
+
 // 404 handler
 app.use((req, res) => {
     res.status(404).sendFile(path.join(__dirname, 'public', 'index.html'));
