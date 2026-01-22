@@ -39,7 +39,23 @@ Sistema profesional de gestión de tickets para servicios informáticos con inte
 
 ## 🐳 Despliegue
 
-### Opción 1: Coolify (Recomendado para Producción)
+### ⚡ Instalación Automática (MÁS FÁCIL)
+
+**Instala TODO con un solo comando:**
+
+```bash
+./install.sh
+```
+
+El script hace TODO automáticamente:
+- ✅ Genera credenciales seguras
+- ✅ Crea configuración
+- ✅ Construye e inicia Docker
+- ✅ Te muestra las credenciales de acceso
+
+📖 **Guía completa:** Ver [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md)
+
+### Opción 1: Coolify (Producción en Servidor)
 
 Despliega fácilmente en tu servidor con Coolify:
 
@@ -52,7 +68,7 @@ Despliega fácilmente en tu servidor con Coolify:
 
 📖 **Guía completa Coolify:** Ver [COOLIFY.md](COOLIFY.md)
 
-### Opción 2: Docker Compose (Local/VPS)
+### Opción 2: Docker Compose Manual (Local/VPS)
 
 ```bash
 # 1. Configurar credenciales
