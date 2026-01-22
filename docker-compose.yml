@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: servicios-informatica-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # Estas variables se pueden sobrescribir con un archivo .env
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-myiatech_admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-MyI@T3ch2026!Secure#Prod}
+      - SESSION_SECRET=${SESSION_SECRET:-k8Jd92mN$xP7qW3z!R5tY#vL1nB4fG6hP9sM2cX5oQ8rA4bE7wN3yT6vU9jK1}
+      - COMPANY_NAME=${COMPANY_NAME:-Servicios Informáticos Profesionales}
+      - COMPANY_EMAIL=${COMPANY_EMAIL:-info@myiatech.xyz}
+      - COMPANY_PHONE=${COMPANY_PHONE:-624620893}
+      - COMPANY_PHONE_FORMATTED=${COMPANY_PHONE_FORMATTED:-+34 624 620 893}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      - EMAIL_FROM=${EMAIL_FROM:-Servicios Informáticos <info@myiatech.xyz>}
+      - EMAIL_TO=${EMAIL_TO:-info@myiatech.xyz}
+    volumes:
+      # Persistir base de datos
+      - ./tickets.db:/app/tickets.db
+      # Persistir sesión de WhatsApp
+      - whatsapp-auth:/app/.wwebjs_auth
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  whatsapp-auth:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

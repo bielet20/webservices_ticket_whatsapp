@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Tickets</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f3f4f6;
+            color: #111827;
+        }
+
+        .admin-header {
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+            color: white;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .admin-header h1 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card .number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2563eb;
+        }
+
+        .filters {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .filters h2 {
+            margin-bottom: 1rem;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .filter-section {
+            margin-bottom: 1rem;
+        }
+
+        .filter-section label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #6b7280;
+        }
+
+        .filter-select {
+            padding: 0.5rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 5px;
+            min-width: 200px;
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-btn:hover {
+            border-color: #2563eb;
+            color: #2563eb;
+        }
+
+        .filter-btn.active {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        .tickets-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .tickets-header {
+            padding: 1.5rem;
+            border-bottom: 2px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .search-box {
+            padding: 0.5rem 1rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 5px;
+            width: 300px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f9fafb;
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #6b7280;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        tr:hover {
+            background: #f9fafb;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .badge-pendiente { background: #fef3c7; color: #92400e; }
+        .badge-en_proceso { background: #dbeafe; color: #1e40af; }
+        .badge-resuelto { background: #d1fae5; color: #065f46; }
+        .badge-cerrado { background: #e5e7eb; color: #374151; }
+
+        .badge-urgente { background: #fee2e2; color: #991b1b; }
+        .badge-alta { background: #fed7aa; color: #9a3412; }
+        .badge-media { background: #fef3c7; color: #92400e; }
+        .badge-baja { background: #d1fae5; color: #065f46; }
+
+        .action-btns {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-small {
+            padding: 0.25rem 0.75rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+        }
+
+        .btn-view { background: #3b82f6; color: white; }
+        .btn-view:hover { background: #2563eb; }
+
+        .btn-update { background: #10b981; color: white; }
+        .btn-update:hover { background: #059669; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+        }
+
+        .detail-row {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 0.25rem;
+        }
+
+        .status-selector {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .status-selector select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 5px;
+            margin-top: 0.5rem;
+        }
+
+        .btn-update-status {
+            width: 100%;
+            padding: 0.75rem;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
+        .btn-update-status:hover {
+            background: #059669;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            color: #d1d5db;
+        }
+
+        .notes-section {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .note-item {
+            background: white;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 5px;
+            border-left: 3px solid #2563eb;
+        }
+
+        .note-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+
+        .note-text {
+            color: #111827;
+        }
+
+        .add-note-form {
+            margin-top: 1rem;
+        }
+
+        .add-note-form textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 5px;
+            margin-bottom: 0.5rem;
+            min-height: 80px;
+        }
+
+        .add-note-form input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .btn-add-note {
+            width: 100%;
+            padding: 0.5rem;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .btn-add-note:hover {
+            background: #1e40af;
+        }
+
+        .assignment-section {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #fef3c7;
+            border-radius: 8px;
+        }
+
+        .btn-export {
+            padding: 0.75rem 1.5rem;
+            background: #059669;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-export:hover {
+            background: #047857;
+        }
+
+        .whatsapp-section {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, #25d366, #128c7e);
+            border-radius: 8px;
+            color: white;
+        }
+
+        .whatsapp-section h3 {
+            color: white;
+            margin-bottom: 1rem;
+        }
+
+        .whatsapp-templates {
+            display: grid;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .template-btn {
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.3s;
+        }
+
+        .template-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
+
+        .btn-whatsapp {
+            width: 100%;
+            padding: 1rem;
+            background: white;
+            color: #128c7e;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .btn-whatsapp:hover {
+            background: #f0f0f0;
+        }
+
+        .whatsapp-history {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+
+        .whatsapp-contact-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+
+        .btn-whatsapp-quick {
+            padding: 0.5rem 1rem;
+            background: #25d366;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+        }
+
+        .btn-whatsapp-quick:hover {
+            background: #128c7e;
+        }
+
+        .custom-message {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            margin-bottom: 1rem;
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .custom-message::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* WhatsApp Web Panel */
+        .whatsapp-panel {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .whatsapp-header {
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            color: white;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .whatsapp-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #00ff00;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .whatsapp-body {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            height: 500px;
+        }
+
+        .chat-list {
+            border-right: 1px solid #e5e7eb;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .chat-item {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .chat-item:hover {
+            background: #e9ecef;
+        }
+
+        .chat-item.active {
+            background: #d1d5db;
+        }
+
+        .chat-item h4 {
+            margin-bottom: 0.25rem;
+            font-size: 1rem;
+        }
+
+        .chat-item p {
+            font-size: 0.85rem;
+            color: #6b7280;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .chat-area {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            background: #f3f4f6;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            display: flex;
+        }
+
+        .message.from-me {
+            justify-content: flex-end;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 0.75rem;
+            border-radius: 10px;
+            word-wrap: break-word;
+        }
+
+        .message.from-me .message-bubble {
+            background: #dcf8c6;
+            border-bottom-right-radius: 0;
+        }
+
+        .message.from-them .message-bubble {
+            background: white;
+            border-bottom-left-radius: 0;
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+
+        .message-input-area {
+            padding: 1rem;
+            border-top: 1px solid #e5e7eb;
+            background: white;
+        }
+
+        .message-form {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 0.75rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 25px;
+            outline: none;
+        }
+
+        .message-input:focus {
+            border-color: #25D366;
+        }
+
+        .send-btn {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .send-btn:hover {
+            background: #128C7E;
+        }
+
+        .qr-container {
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .qr-code {
+            max-width: 300px;
+            margin: 1rem auto;
+        }
+
+        .empty-chat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #6b7280;
+        }
+
+        .toggle-whatsapp {
+            background: white;
+            color: #25D366;
+            border: 2px solid #25D366;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .toggle-whatsapp:hover {
+            background: #25D366;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <div class="container">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1><i class="fas fa-tachometer-alt"></i> Panel de Administración de Tickets</h1>
+                <button onclick="logout()" style="background: rgba(255,255,255,0.2); color: white; border: 2px solid white; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer; font-weight: 600;">
+                    <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Tickets</h3>
+                <div class="number" id="stat-total">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Pendientes</h3>
+                <div class="number" id="stat-pendiente">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>En Proceso</h3>
+                <div class="number" id="stat-en-proceso">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Resueltos</h3>
+                <div class="number" id="stat-resuelto">0</div>
+            </div>
+        </div>
+
+        <!-- WhatsApp Web Panel -->
+        <div class="whatsapp-panel" id="whatsappPanel" style="display: none;">
+            <div class="whatsapp-header">
+                <div>
+                    <h2 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fab fa-whatsapp"></i> WhatsApp Web
+                    </h2>
+                </div>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <div class="whatsapp-status" id="whatsappStatus">
+                        <span class="status-dot" id="statusDot"></span>
+                        <span id="statusText">Desconectado</span>
+                    </div>
+                    <button class="toggle-whatsapp" onclick="toggleWhatsAppPanel()">
+                        <i class="fas fa-times"></i> Cerrar
+                    </button>
+                </div>
+            </div>
+            <div class="whatsapp-body" id="whatsappBody">
+                <div id="whatsappContent">
+                    <div class="qr-container">
+                        <i class="fab fa-whatsapp" style="font-size: 4rem; color: #25D366;"></i>
+                        <h3>Conectando a WhatsApp...</h3>
+                        <p>Esperando código QR...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toggle WhatsApp Button -->
+        <div style="margin-bottom: 2rem;">
+            <button class="toggle-whatsapp" onclick="toggleWhatsAppPanel()">
+                <i class="fab fa-whatsapp"></i> <span id="toggleBtnText">Abrir WhatsApp Web</span>
+            </button>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <h2>Filtrar Tickets</h2>
+            <div class="filter-section">
+                <label>Estado:</label>
+                <div class="filter-group">
+                    <button class="filter-btn active" data-filter="todos">Todos</button>
+                    <button class="filter-btn" data-filter="pendiente">Pendientes</button>
+                    <button class="filter-btn" data-filter="en_proceso">En Proceso</button>
+                    <button class="filter-btn" data-filter="resuelto">Resueltos</button>
+                    <button class="filter-btn" data-filter="cerrado">Cerrados</button>
+                </div>
+            </div>
+            <div class="filter-section">
+                <label>Servicio:</label>
+                <select class="filter-select" id="filterServicio">
+                    <option value="todos">Todos los servicios</option>
+                    <option value="reparacion">Reparación de Equipos</option>
+                    <option value="redes">Montaje de Redes</option>
+                    <option value="impresoras">Soporte de Impresoras</option>
+                    <option value="seguridad">Seguridad Informática</option>
+                    <option value="errores">Detección de Errores</option>
+                    <option value="soporte">Soporte Técnico General</option>
+                    <option value="desarrollo_app">Programación de Aplicaciones Personalizadas</option>
+                    <option value="desarrollo_web">Desarrollo de Entornos Web</option>
+                </select>
+            </div>
+            <div class="filter-section">
+                <label>Prioridad:</label>
+                <select class="filter-select" id="filterPrioridad">
+                    <option value="todos">Todas las prioridades</option>
+                    <option value="urgente">Urgente</option>
+                    <option value="alta">Alta</option>
+                    <option value="media">Media</option>
+                    <option value="baja">Baja</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Tickets Table -->
+        <div class="tickets-container">
+            <div class="tickets-header">
+                <h2>Lista de Tickets</h2>
+                <div style="display: flex; gap: 1rem;">
+                    <button class="btn-export" onclick="exportToCSV()">
+                        <i class="fas fa-download"></i> Exportar CSV
+                    </button>
+                    <input type="text" class="search-box" id="searchBox" placeholder="Buscar tickets...">
+                </div>
+            </div>
+            <div id="ticketsTableContainer">
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin fa-3x"></i>
+                    <p>Cargando tickets...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for ticket details -->
+    <div id="ticketModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Detalles del Ticket</h2>
+                <button class="close-modal" onclick="closeModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="ticketDetails"></div>
+        </div>
+    </div>
+
+    <script>
+        let allTickets = [];
+        let filteredTickets = [];
+        let currentFilter = 'todos';
+        let currentServicioFilter = 'todos';
+        let currentPrioridadFilter = 'todos';
+
+        // Load tickets on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTickets();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Filter buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentFilter = e.target.dataset.filter;
+                    filterTickets();
+                });
+            });
+
+            // Servicio filter
+            document.getElementById('filterServicio').addEventListener('change', (e) => {
+                currentServicioFilter = e.target.value;
+                filterTickets();
+            });
+
+            // Prioridad filter
+            document.getElementById('filterPrioridad').addEventListener('change', (e) => {
+                currentPrioridadFilter = e.target.value;
+                filterTickets();
+            });
+
+            // Search box
+            document.getElementById('searchBox').addEventListener('input', (e) => {
+                searchTickets(e.target.value);
+            });
+        }
+
+        async function loadTickets() {
+            try {
+                const response = await fetch('/api/tickets');
+                
+                // Verificar si la sesión expiró
+                if (response.status === 401) {
+                    alert('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+                    window.location.href = '/login';
+                    return;
+                }
+                
+                allTickets = await response.json();
+                updateStatistics();
+                filterTickets();
+            } catch (error) {
+                console.error('Error loading tickets:', error);
+                document.getElementById('ticketsTableContainer').innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Error al cargar los tickets</p>
+                    </div>
+                `;
+            }
+        }
+
+        function updateStatistics() {
+            document.getElementById('stat-total').textContent = allTickets.length;
+            document.getElementById('stat-pendiente').textContent = 
+                allTickets.filter(t => t.estado === 'pendiente').length;
+            document.getElementById('stat-en-proceso').textContent = 
+                allTickets.filter(t => t.estado === 'en_proceso').length;
+            document.getElementById('stat-resuelto').textContent = 
+                allTickets.filter(t => t.estado === 'resuelto').length;
+        }
+
+        function filterTickets() {
+            filteredTickets = allTickets;
+            
+            // Filter by status
+            if (currentFilter !== 'todos') {
+                filteredTickets = filteredTickets.filter(t => t.estado === currentFilter);
+            }
+            
+            // Filter by service
+            if (currentServicioFilter !== 'todos') {
+                filteredTickets = filteredTickets.filter(t => t.servicio === currentServicioFilter);
+            }
+            
+            // Filter by priority
+            if (currentPrioridadFilter !== 'todos') {
+                filteredTickets = filteredTickets.filter(t => t.prioridad === currentPrioridadFilter);
+            }
+            
+            renderTicketsTable();
+        }
+
+        function searchTickets(query) {
+            const lowerQuery = query.toLowerCase();
+            filteredTickets = allTickets.filter(t => 
+                t.ticket_id.toLowerCase().includes(lowerQuery) ||
+                t.nombre.toLowerCase().includes(lowerQuery) ||
+                t.email.toLowerCase().includes(lowerQuery) ||
+                t.descripcion.toLowerCase().includes(lowerQuery)
+            );
+            renderTicketsTable();
+        }
+
+        function renderTicketsTable() {
+            const container = document.getElementById('ticketsTableContainer');
+            
+            if (filteredTickets.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No hay tickets para mostrar</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const servicios = {
+                'reparacion': 'Reparación',
+                'redes': 'Redes',
+                'impresoras': 'Impresoras',
+                'seguridad': 'Seguridad',
+                'errores': 'Errores',
+                'soporte': 'Soporte'
+            };
+
+            const html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ticket ID</th>
+                            <th>Cliente</th>
+                            <th>Servicio</th>
+                            <th>Prioridad</th>
+                            <th>Estado</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredTickets.map(ticket => `
+                            <tr>
+                                <td><strong>${ticket.ticket_id}</strong></td>
+                                <td>
+                                    ${ticket.nombre}
+                                    ${ticket.tecnico_asignado ? `<br><small style="color: #2563eb;"><i class="fas fa-user"></i> ${ticket.tecnico_asignado}</small>` : ''}
+                                </td>
+                                <td>${servicios[ticket.servicio] || ticket.servicio}</td>
+                                <td><span class="badge badge-${ticket.prioridad}">${ticket.prioridad}</span></td>
+                                <td><span class="badge badge-${ticket.estado}">${ticket.estado.replace('_', ' ')}</span></td>
+                                <td>${new Date(ticket.fecha_creacion).toLocaleDateString('es-ES')}</td>
+                                <td>
+                                    <div class="action-btns">
+                                        <button class="btn-small btn-view" onclick="viewTicket('${ticket.ticket_id}')">
+                                            <i class="fas fa-eye"></i> Ver
+                                        </button>
+                                        <button class="btn-whatsapp-quick" onclick="openWhatsApp('${ticket.telefono}', '${ticket.ticket_id}', '${ticket.nombre}')">
+                                            <i class="fab fa-whatsapp"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        async function viewTicket(ticketId) {
+            try {
+                const [ticketResponse, notesResponse, whatsappResponse] = await Promise.all([
+                    fetch(`/api/tickets/${ticketId}`),
+                    fetch(`/api/tickets/${ticketId}/notes`),
+                    fetch(`/api/tickets/${ticketId}/whatsapp`)
+                ]);
+                
+                const ticket = await ticketResponse.json();
+                const notes = await notesResponse.json();
+                const whatsappContacts = await whatsappResponse.json();
+                
+                const servicios = {
+                    'reparacion': 'Reparación de Equipos',
+                    'redes': 'Montaje de Redes',
+                    'impresoras': 'Soporte de Impresoras',
+                    'seguridad': 'Seguridad Informática',
+                    'errores': 'Detección de Errores',
+                    'soporte': 'Soporte Técnico General',
+                    'desarrollo_app': 'Programación de Aplicaciones Personalizadas',
+                    'desarrollo_web': 'Desarrollo de Entornos Web'
+                };
+
+                const notesHtml = notes.length > 0 ? notes.map(note => `
+                    <div class="note-item">
+                        <div class="note-header">
+                            <strong>${note.autor}</strong>
+                            <span>${new Date(note.fecha_creacion).toLocaleString('es-ES')}</span>
+                        </div>
+                        <div class="note-text">${note.nota}</div>
+                    </div>
+                `).join('') : '<p style="color: #6b7280;">No hay notas aún</p>';
+
+                const whatsappHistoryHtml = whatsappContacts.length > 0 ? whatsappContacts.map(contact => `
+                    <div class="whatsapp-contact-item">
+                        <strong>${contact.enviado_por}</strong> contactó al cliente
+                        ${contact.mensaje ? `<br>Mensaje: "${contact.mensaje}"` : ''}
+                        <br><small>${new Date(contact.fecha_contacto).toLocaleString('es-ES')}</small>
+                    </div>
+                `).join('') : '<p style="color: rgba(255,255,255,0.7); font-size: 0.9rem;">No hay contactos previos</p>';
+
+                document.getElementById('ticketDetails').innerHTML = `
+                    <div class="detail-row">
+                        <div class="detail-label">Ticket ID</div>
+                        <div><strong>${ticket.ticket_id}</strong></div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Cliente</div>
+                        <div>${ticket.nombre}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Email</div>
+                        <div>${ticket.email}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Teléfono</div>
+                        <div>${ticket.telefono}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Servicio</div>
+                        <div>${servicios[ticket.servicio]}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Prioridad</div>
+                        <div><span class="badge badge-${ticket.prioridad}">${ticket.prioridad}</span></div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Descripción</div>
+                        <div>${ticket.descripcion}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Fecha de Creación</div>
+                        <div>${new Date(ticket.fecha_creacion).toLocaleString('es-ES')}</div>
+                    </div>
+
+                    <div class="whatsapp-section">
+                        <h3><i class="fab fa-whatsapp"></i> Contactar por WhatsApp</h3>
+                        <div class="whatsapp-templates">
+                            <button class="template-btn" onclick="setWhatsAppMessage('Hola ${ticket.nombre}, somos del servicio técnico. Hemos recibido tu solicitud ${ticket.ticket_id} sobre ${servicios[ticket.servicio]}. ¿En qué momento podemos visitarte?')">
+                                📅 Solicitar visita
+                            </button>
+                            <button class="template-btn" onclick="setWhatsAppMessage('Hola ${ticket.nombre}, te informamos que estamos trabajando en tu caso ${ticket.ticket_id}. Te mantendremos informado del progreso.')">
+                                🔧 Actualización de estado
+                            </button>
+                            <button class="template-btn" onclick="setWhatsAppMessage('Hola ${ticket.nombre}, tu caso ${ticket.ticket_id} ha sido resuelto. ¿Podrías confirmar que todo funciona correctamente?')">
+                                ✅ Caso resuelto
+                            </button>
+                            <button class="template-btn" onclick="setWhatsAppMessage('Hola ${ticket.nombre}, necesitamos más información sobre tu caso ${ticket.ticket_id}. ¿Podrías proporcionarnos más detalles?')">
+                                ℹ️ Solicitar información
+                            </button>
+                        </div>
+                        <textarea class="custom-message" id="whatsappMessage" placeholder="Escribe un mensaje personalizado o selecciona una plantilla..."></textarea>
+                        <input type="text" id="tecnicoWhatsApp" placeholder="Tu nombre (técnico)" style="width: 100%; padding: 0.75rem; border: 2px solid rgba(255,255,255,0.3); border-radius: 5px; background: rgba(255,255,255,0.2); color: white; margin-bottom: 1rem;">
+                        <button class="btn-whatsapp" onclick="sendWhatsApp('${ticket.telefono}', '${ticket.ticket_id}', '${ticket.nombre}')">
+                            <i class="fab fa-whatsapp"></i> Abrir WhatsApp y Enviar Mensaje
+                        </button>
+                        <div class="whatsapp-history">
+                            <strong>Historial de Contactos:</strong>
+                            <div style="margin-top: 0.5rem;">
+                                ${whatsappHistoryHtml}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="assignment-section">
+                        <div class="detail-label"><i class="fas fa-user"></i> Asignar Técnico</div>
+                        <input type="text" id="tecnicoInput" placeholder="Nombre del técnico" value="${ticket.tecnico_asignado || ''}" style="width: 100%; padding: 0.5rem; border: 2px solid #e5e7eb; border-radius: 5px; margin-top: 0.5rem;">
+                        <button class="btn-update-status" onclick="assignTechnicianToTicket('${ticket.ticket_id}')" style="background: #f59e0b; margin-top: 0.5rem;">
+                            <i class="fas fa-user-check"></i> Asignar Técnico
+                        </button>
+                    </div>
+
+                    <div class="notes-section">
+                        <h3><i class="fas fa-comment"></i> Notas Internas</h3>
+                        <div style="max-height: 300px; overflow-y: auto; margin-top: 1rem;">
+                            ${notesHtml}
+                        </div>
+                        <div class="add-note-form">
+                            <input type="text" id="autorNota" placeholder="Tu nombre" style="width: 100%;">
+                            <textarea id="nuevaNota" placeholder="Escribe una nota interna..."></textarea>
+                            <button class="btn-add-note" onclick="addNote('${ticket.ticket_id}')">
+                                <i class="fas fa-plus"></i> Añadir Nota
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="status-selector">
+                        <div class="detail-label">Actualizar Estado</div>
+                        <select id="statusSelect">
+                            <option value="pendiente" ${ticket.estado === 'pendiente' ? 'selected' : ''}>Pendiente</option>
+                            <option value="en_proceso" ${ticket.estado === 'en_proceso' ? 'selected' : ''}>En Proceso</option>
+                            <option value="resuelto" ${ticket.estado === 'resuelto' ? 'selected' : ''}>Resuelto</option>
+                            <option value="cerrado" ${ticket.estado === 'cerrado' ? 'selected' : ''}>Cerrado</option>
+                        </select>
+                        <button class="btn-update-status" onclick="updateTicketStatus('${ticket.ticket_id}')">
+                            <i class="fas fa-save"></i> Actualizar Estado
+                        </button>
+                    </div>
+                `;
+                
+                document.getElementById('ticketModal').classList.add('active');
+            } catch (error) {
+                console.error('Error loading ticket details:', error);
+            }
+        }
+
+        async function updateTicketStatus(ticketId) {
+            const newStatus = document.getElementById('statusSelect').value;
+            
+            try {
+                const response = await fetch(`/api/tickets/${ticketId}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ estado: newStatus })
+                });
+
+                if (response.ok) {
+                    alert('Estado actualizado correctamente');
+                    closeModal();
+                    loadTickets();
+                } else {
+                    alert('Error al actualizar el estado');
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                alert('Error al actualizar el estado');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('ticketModal').classList.remove('active');
+        }
+
+        async function addNote(ticketId) {
+            const nota = document.getElementById('nuevaNota').value;
+            const autor = document.getElementById('autorNota').value;
+            
+            if (!nota || !autor) {
+                alert('Por favor completa todos los campos');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/tickets/${ticketId}/notes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nota, autor })
+                });
+                
+                if (response.ok) {
+                    viewTicket(ticketId); // Reload ticket to show new note
+                } else {
+                    alert('Error al añadir nota');
+                }
+            } catch (error) {
+                console.error('Error adding note:', error);
+                alert('Error al añadir nota');
+            }
+        }
+
+        async function assignTechnicianToTicket(ticketId) {
+            const tecnico = document.getElementById('tecnicoInput').value;
+            
+            if (!tecnico) {
+                alert('Por favor ingresa el nombre del técnico');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/tickets/${ticketId}/assign`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tecnico })
+                });
+                
+                if (response.ok) {
+                    alert('Técnico asignado correctamente');
+                    closeModal();
+                    loadTickets();
+                } else {
+                    alert('Error al asignar técnico');
+                }
+            } catch (error) {
+                console.error('Error assigning technician:', error);
+                alert('Error al asignar técnico');
+            }
+        }
+
+        function exportToCSV() {
+            if (filteredTickets.length === 0) {
+                alert('No hay tickets para exportar');
+                return;
+            }
+
+            const servicios = {
+                'reparacion': 'Reparación de Equipos',
+                'redes': 'Montaje de Redes',
+                'impresoras': 'Soporte de Impresoras',
+                'seguridad': 'Seguridad Informática',
+                'errores': 'Detección de Errores',
+                'soporte': 'Soporte Técnico General',
+                'desarrollo_app': 'Programación de Aplicaciones Personalizadas',
+                'desarrollo_web': 'Desarrollo de Entornos Web'
+            };
+
+            const headers = ['Ticket ID', 'Cliente', 'Email', 'Teléfono', 'Servicio', 'Prioridad', 'Estado', 'Técnico Asignado', 'Descripción', 'Fecha'];
+            const rows = filteredTickets.map(ticket => [
+                ticket.ticket_id,
+                ticket.nombre,
+                ticket.email,
+                ticket.telefono,
+                servicios[ticket.servicio] || ticket.servicio,
+                ticket.prioridad,
+                ticket.estado,
+                ticket.tecnico_asignado || 'No asignado',
+                ticket.descripcion.replace(/,/g, ';'),
+                new Date(ticket.fecha_creacion).toLocaleString('es-ES')
+            ]);
+
+            const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `tickets_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        function setWhatsAppMessage(message) {
+            document.getElementById('whatsappMessage').value = message;
+        }
+
+        function formatPhoneNumber(phone) {
+            // Remove all non-numeric characters
+            let cleaned = phone.replace(/\D/g, '');
+            
+            // If starts with 0, assume it's a national number and add country code
+            if (cleaned.startsWith('0')) {
+                cleaned = '34' + cleaned.substring(1); // Spain country code
+            }
+            
+            // If doesn't start with country code, add Spain code
+            if (!cleaned.startsWith('34') && cleaned.length < 11) {
+                cleaned = '34' + cleaned;
+            }
+            
+            return cleaned;
+        }
+
+        async function sendWhatsApp(phone, ticketId, clientName) {
+            const message = document.getElementById('whatsappMessage').value;
+            const tecnico = document.getElementById('tecnicoWhatsApp').value;
+            
+            if (!tecnico) {
+                alert('Por favor ingresa tu nombre');
+                return;
+            }
+
+            const formattedPhone = formatPhoneNumber(phone);
+            const encodedMessage = encodeURIComponent(message || `Hola ${clientName}, te contacto por tu ticket ${ticketId}.`);
+            const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+            
+            // Register contact in database
+            try {
+                await fetch(`/api/tickets/${ticketId}/whatsapp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        telefono: phone, 
+                        mensaje: message || `Hola ${clientName}, te contacto por tu ticket ${ticketId}.`,
+                        enviado_por: tecnico 
+                    })
+                });
+            } catch (error) {
+                console.error('Error registering WhatsApp contact:', error);
+            }
+            
+            // Open WhatsApp
+            window.open(whatsappUrl, '_blank');
+            
+            // Reload ticket to show new contact
+            setTimeout(() => viewTicket(ticketId), 1000);
+        }
+
+        function openWhatsApp(phone, ticketId, clientName) {
+            const formattedPhone = formatPhoneNumber(phone);
+            const message = `Hola ${clientName}, te contacto por tu ticket ${ticketId}. ¿En qué puedo ayudarte?`;
+            const encodedMessage = encodeURIComponent(message);
+            const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+            
+            window.open(whatsappUrl, '_blank');
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadTickets, 30000);
+
+        // Logout function
+        async function logout() {
+            if (confirm('¿Está seguro que desea cerrar sesión?')) {
+                try {
+                    await fetch('/api/logout', { method: 'POST' });
+                    window.location.href = '/login';
+                } catch (error) {
+                    console.error('Error al cerrar sesión:', error);
+                    window.location.href = '/login';
+                }
+            }
+        }
+
+        // ====================================
+        // WhatsApp Web Integration
+        // ====================================
+
+        let whatsappChats = [];
+        let currentChatId = null;
+        let whatsappStatusInterval = null;
+        let chatRefreshInterval = null;
+
+        // Toggle WhatsApp Panel
+        function toggleWhatsAppPanel() {
+            const panel = document.getElementById('whatsappPanel');
+            const btnText = document.getElementById('toggleBtnText');
+            
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                btnText.textContent = 'Cerrar WhatsApp Web';
+                checkWhatsAppStatus();
+                if (!whatsappStatusInterval) {
+                    whatsappStatusInterval = setInterval(checkWhatsAppStatus, 5000);
+                }
+            } else {
+                panel.style.display = 'none';
+                btnText.textContent = 'Abrir WhatsApp Web';
+                if (whatsappStatusInterval) {
+                    clearInterval(whatsappStatusInterval);
+                    whatsappStatusInterval = null;
+                }
+                if (chatRefreshInterval) {
+                    clearInterval(chatRefreshInterval);
+                    chatRefreshInterval = null;
+                }
+                currentChatId = null;
+            }
+        }
+
+        // Check WhatsApp connection status
+        async function checkWhatsAppStatus() {
+            try {
+                const response = await fetch('/api/whatsapp/status');
+                const status = await response.json();
+                
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                const whatsappContent = document.getElementById('whatsappContent');
+                
+                if (status.isReady) {
+                    statusDot.classList.add('connected');
+                    statusText.textContent = 'Conectado';
+                    
+                    // Solo cargar chats si no hay uno seleccionado o es la primera vez
+                    if (!currentChatId) {
+                        loadWhatsAppChats();
+                    }
+                } else if (status.hasQR && status.qrCode) {
+                    statusDot.classList.remove('connected');
+                    statusText.textContent = 'Esperando escaneo QR';
+                    showQRCode(status.qrCode);
+                } else {
+                    statusDot.classList.remove('connected');
+                    statusText.textContent = 'Desconectado';
+                    whatsappContent.innerHTML = `
+                        <div class="qr-container">
+                            <i class="fab fa-whatsapp" style="font-size: 4rem; color: #25D366;"></i>
+                            <h3>Iniciando WhatsApp...</h3>
+                            <p>Por favor espere...</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error al verificar estado de WhatsApp:', error);
+            }
+        }
+
+        // Show QR Code
+        function showQRCode(qrData) {
+            const whatsappContent = document.getElementById('whatsappContent');
+            whatsappContent.innerHTML = `
+                <div class="qr-container">
+                    <h3>Escanea el código QR con WhatsApp</h3>
+                    <p>Abre WhatsApp en tu teléfono:</p>
+                    <ol style="text-align: left; display: inline-block; margin: 1rem 0;">
+                        <li>Toca Menú o Configuración</li>
+                        <li>Toca Dispositivos vinculados</li>
+                        <li>Toca Vincular un dispositivo</li>
+                        <li>Apunta tu teléfono hacia esta pantalla</li>
+                    </ol>
+                    <div id="qrcode"></div>
+                    <p style="margin-top: 1rem; color: #6b7280; font-size: 0.9rem;">El código QR se actualizará automáticamente</p>
+                </div>
+            `;
+            
+            // Usar biblioteca QRCode si está disponible, sino usar imagen de API
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}" alt="QR Code" class="qr-code">`;
+        }
+
+        // Load WhatsApp chats
+        async function loadWhatsAppChats() {
+            try {
+                const response = await fetch('/api/whatsapp/chats');
+                whatsappChats = await response.json();
+                
+                const whatsappBody = document.getElementById('whatsappBody');
+                whatsappBody.innerHTML = `
+                    <div class="chat-list" id="chatList">
+                        ${whatsappChats.map(chat => `
+                            <div class="chat-item" onclick="selectChat('${chat.id}')">
+                                <h4>${chat.name || chat.id.split('@')[0]}</h4>
+                                <p>${chat.lastMessage ? chat.lastMessage.body : 'Sin mensajes'}</p>
+                                ${chat.unreadCount > 0 ? `<span style="background: #25D366; color: white; padding: 0.2rem 0.5rem; border-radius: 10px; font-size: 0.75rem;">${chat.unreadCount}</span>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="chat-area">
+                        <div class="empty-chat">
+                            <i class="fab fa-whatsapp" style="font-size: 4rem; color: #d1d5db;"></i>
+                            <p>Selecciona un chat para ver los mensajes</p>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error al cargar chats:', error);
+            }
+        }
+
+        // Select a chat
+        async function selectChat(chatId) {
+            currentChatId = chatId;
+            
+            // Update active state
+            document.querySelectorAll('.chat-item').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.chat-item').forEach(item => {
+                if (item.onclick && item.onclick.toString().includes(chatId)) {
+                    item.classList.add('active');
+                }
+            });
+            
+            // Cargar mensajes del chat
+            await loadChatMessages(chatId);
+            
+            // Iniciar actualización automática de mensajes cada 10 segundos
+            if (chatRefreshInterval) {
+                clearInterval(chatRefreshInterval);
+            }
+            chatRefreshInterval = setInterval(() => {
+                if (currentChatId === chatId) {
+                    loadChatMessages(chatId, true); // true = no hacer scroll
+                }
+            }, 10000);
+        }
+
+        // Load messages for a specific chat
+        async function loadChatMessages(chatId, noScroll = false) {
+            try {
+                const response = await fetch(`/api/whatsapp/chats/${encodeURIComponent(chatId)}/messages`);
+                const messages = await response.json();
+                
+                const chatName = whatsappChats.find(c => c.id === chatId)?.name || chatId.split('@')[0];
+                
+                const whatsappBody = document.getElementById('whatsappBody');
+                const chatListHtml = document.querySelector('.chat-list')?.outerHTML || '';
+                
+                whatsappBody.innerHTML = chatListHtml + `
+                    <div class="chat-area">
+                        <div style="padding: 1rem; border-bottom: 1px solid #e5e7eb; background: white;">
+                            <h3 style="margin: 0;">${chatName}</h3>
+                        </div>
+                        <div class="messages-container" id="messagesContainer">
+                            ${messages.reverse().map(msg => `
+                                <div class="message ${msg.fromMe ? 'from-me' : 'from-them'}">
+                                    <div class="message-bubble">
+                                        ${msg.body}
+                                        <div class="message-time">${new Date(msg.timestamp * 1000).toLocaleString('es-ES')}</div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="message-input-area">
+                            <form class="message-form" onsubmit="sendWhatsAppMessage(event)">
+                                <input type="text" class="message-input" id="messageInput" placeholder="Escribe un mensaje..." required>
+                                <button type="submit" class="send-btn">
+                                    <i class="fas fa-paper-plane"></i> Enviar
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                `;
+                
+                // Restaurar estado activo del chat
+                document.querySelectorAll('.chat-item').forEach(item => {
+                    if (item.onclick && item.onclick.toString().includes(chatId)) {
+                        item.classList.add('active');
+                    }
+                });
+                
+                // Scroll to bottom solo si no es una actualización automática
+                if (!noScroll) {
+                    const messagesContainer = document.getElementById('messagesContainer');
+                    if (messagesContainer) {
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error al cargar mensajes:', error);
+            }
+        }
+
+        // Send WhatsApp message
+        async function sendWhatsAppMessage(event) {
+            event.preventDefault();
+            
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || !currentChatId) return;
+            
+            try {
+                // Extract phone number from chatId
+                const phoneNumber = currentChatId.split('@')[0];
+                
+                const response = await fetch('/api/whatsapp/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber, message })
+                });
+                
+                if (response.ok) {
+                    input.value = '';
+                    // Reload messages inmediatamente
+                    await loadChatMessages(currentChatId);
+                } else {
+                    const error = await response.json();
+                    alert('Error al enviar mensaje: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al enviar mensaje');
+            }
+        }
+    </script>
+</body>
+</html>

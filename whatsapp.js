@@ -1,0 +1,220 @@
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
+
+class WhatsAppService {
+    constructor() {
+        this.client = null;
+        this.isReady = false;
+        this.qrCode = null;
+        this.messageHandlers = [];
+    }
+
+    initialize() {
+        console.log('🔄 Inicializando cliente de WhatsApp...');
+        
+        this.client = new Client({
+            authStrategy: new LocalAuth({
+                dataPath: '.wwebjs_auth'
+            }),
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu'
+                ]
+            }
+        });
+
+        // Evento: QR Code generado
+        this.client.on('qr', (qr) => {
+            this.qrCode = qr;
+            console.log('\n📱 Escanea este código QR con WhatsApp:\n');
+            qrcode.generate(qr, { small: true });
+            console.log('\n💡 Abre WhatsApp > Dispositivos vinculados > Vincular dispositivo\n');
+        });
+
+        // Evento: Cliente listo
+        this.client.on('ready', () => {
+            this.isReady = true;
+            this.qrCode = null;
+            console.log('✅ WhatsApp Web está listo y conectado');
+        });
+
+        // Evento: Autenticación exitosa
+        this.client.on('authenticated', () => {
+            console.log('✅ Autenticación exitosa con WhatsApp');
+        });
+
+        // Evento: Error de autenticación
+        this.client.on('auth_failure', (msg) => {
+            console.error('❌ Error de autenticación:', msg);
+            this.isReady = false;
+        });
+
+        // Evento: Cliente desconectado
+        this.client.on('disconnected', (reason) => {
+            console.log('⚠️ WhatsApp desconectado:', reason);
+            this.isReady = false;
+            this.qrCode = null;
+        });
+
+        // Evento: Mensaje recibido
+        this.client.on('message', async (message) => {
+            // Ejecutar handlers registrados
+            for (const handler of this.messageHandlers) {
+                try {
+                    await handler(message);
+                } catch (error) {
+                    console.error('Error en message handler:', error);
+                }
+            }
+        });
+
+        // Inicializar cliente
+        this.client.initialize();
+    }
+
+    // Registrar un handler para mensajes entrantes
+    onMessage(handler) {
+        this.messageHandlers.push(handler);
+    }
+
+    // Enviar mensaje de texto
+    async sendMessage(phoneNumber, message) {
+        if (!this.isReady) {
+            throw new Error('WhatsApp no está conectado. Escanee el código QR primero.');
+        }
+
+        try {
+            // Formatear número (remover caracteres especiales)
+            const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
+            const chatId = `${formattedNumber}@c.us`;
+            
+            await this.client.sendMessage(chatId, message);
+            
+            return {
+                success: true,
+                message: 'Mensaje enviado correctamente',
+                to: phoneNumber,
+                timestamp: new Date()
+            };
+        } catch (error) {
+            console.error('Error al enviar mensaje:', error);
+            throw new Error(`Error al enviar mensaje: ${error.message}`);
+        }
+    }
+
+    // Obtener todos los chats
+    async getChats() {
+        if (!this.isReady) {
+            throw new Error('WhatsApp no está conectado');
+        }
+
+        try {
+            const chats = await this.client.getChats();
+            
+            return chats.map(chat => ({
+                id: chat.id._serialized,
+                name: chat.name,
+                isGroup: chat.isGroup,
+                unreadCount: chat.unreadCount,
+                timestamp: chat.timestamp,
+                lastMessage: chat.lastMessage ? {
+                    body: chat.lastMessage.body,
+                    timestamp: chat.lastMessage.timestamp,
+                    fromMe: chat.lastMessage.fromMe
+                } : null
+            }));
+        } catch (error) {
+            console.error('Error al obtener chats:', error);
+            throw new Error(`Error al obtener chats: ${error.message}`);
+        }
+    }
+
+    // Obtener mensajes de un chat específico
+    async getChatMessages(chatId, limit = 50) {
+        if (!this.isReady) {
+            throw new Error('WhatsApp no está conectado');
+        }
+
+        try {
+            const chat = await this.client.getChatById(chatId);
+            const messages = await chat.fetchMessages({ limit });
+            
+            return messages.map(msg => ({
+                id: msg.id._serialized,
+                body: msg.body,
+                timestamp: msg.timestamp,
+                fromMe: msg.fromMe,
+                author: msg.author,
+                type: msg.type,
+                hasMedia: msg.hasMedia
+            }));
+        } catch (error) {
+            console.error('Error al obtener mensajes:', error);
+            throw new Error(`Error al obtener mensajes: ${error.message}`);
+        }
+    }
+
+    // Obtener información de contacto
+    async getContactInfo(phoneNumber) {
+        if (!this.isReady) {
+            throw new Error('WhatsApp no está conectado');
+        }
+
+        try {
+            const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
+            const contactId = `${formattedNumber}@c.us`;
+            const contact = await this.client.getContactById(contactId);
+            
+            return {
+                id: contact.id._serialized,
+                name: contact.name || contact.pushname,
+                number: contact.number,
+                isMyContact: contact.isMyContact,
+                isWAContact: contact.isWAContact
+            };
+        } catch (error) {
+            console.error('Error al obtener contacto:', error);
+            throw new Error(`Error al obtener contacto: ${error.message}`);
+        }
+    }
+
+    // Verificar estado de conexión
+    getStatus() {
+        return {
+            isReady: this.isReady,
+            hasQR: !!this.qrCode,
+            qrCode: this.qrCode,
+            state: this.client ? this.client.pupPage ? 'connected' : 'initializing' : 'not-initialized'
+        };
+    }
+
+    // Cerrar sesión
+    async logout() {
+        if (this.client) {
+            await this.client.logout();
+            this.isReady = false;
+            this.qrCode = null;
+        }
+    }
+
+    // Destruir cliente
+    async destroy() {
+        if (this.client) {
+            await this.client.destroy();
+            this.isReady = false;
+            this.qrCode = null;
+        }
+    }
+}
+
+// Singleton instance
+const whatsappService = new WhatsAppService();
+
+module.exports = whatsappService;
