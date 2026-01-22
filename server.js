@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const session = require('express-session');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const { 
@@ -15,7 +16,13 @@ const {
     getTicketNotes,
     assignTechnician,
     registerWhatsAppContact,
-    getWhatsAppContacts
+    getWhatsAppContacts,
+    getAllUsers,
+    getUserByUsername,
+    createUser,
+    updateUser,
+    updateUserLastAccess,
+    deleteUser
 } = require('./database');
 
 const { 
@@ -90,40 +97,66 @@ app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     
-    const validUsername = process.env.ADMIN_USERNAME || 'admin';
-    const validPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    const isProduction = process.env.NODE_ENV === 'production';
-    
-    // TEMPORAL: Bloqueo desactivado para configuración inicial
-    // TODO: Reactivar después de configurar variables de entorno en Coolify
-    /*
-    if (isProduction && username === 'admin' && password === 'admin123') {
-        return res.status(403).json({ 
-            success: false, 
-            message: '🔒 PRODUCCIÓN: Las credenciales por defecto están deshabilitadas. Use las credenciales de producción configuradas en el sistema.',
-            environment: 'production',
-            blocked: true
-        });
-    }
-    */
-    
-    if (username === validUsername && password === validPassword) {
-        req.session.authenticated = true;
-        req.session.username = username;
-        const environment = isProduction ? 'production' : 'development';
-        res.json({ 
-            success: true, 
-            message: isProduction ? '✓ Acceso autorizado - Entorno de Producción' : '✓ Login exitoso - Entorno de Desarrollo',
-            environment: environment
-        });
-    } else {
+    try {
+        // Intentar autenticación con base de datos primero
+        const user = await getUserByUsername(username);
+        
+        if (user && user.activo) {
+            // Verificar contraseña hasheada
+            const match = await bcrypt.compare(password, user.password_hash);
+            
+            if (match) {
+                req.session.authenticated = true;
+                req.session.username = username;
+                req.session.userId = user.id;
+                req.session.rol = user.rol;
+                
+                // Actualizar último acceso
+                await updateUserLastAccess(username);
+                
+                return res.json({ 
+                    success: true, 
+                    message: `✓ Bienvenido ${user.nombre_completo || username}`,
+                    user: {
+                        username: user.username,
+                        nombre: user.nombre_completo,
+                        rol: user.rol
+                    }
+                });
+            }
+        }
+        
+        // Fallback a variables de entorno (para compatibilidad)
+        const validUsername = process.env.ADMIN_USERNAME || 'admin';
+        const validPassword = process.env.ADMIN_PASSWORD || 'admin123';
+        const isProduction = process.env.NODE_ENV === 'production';
+        
+        if (username === validUsername && password === validPassword) {
+            req.session.authenticated = true;
+            req.session.username = username;
+            req.session.rol = 'admin';
+            
+            return res.json({ 
+                success: true, 
+                message: isProduction ? '✓ Acceso autorizado - Entorno de Producción' : '✓ Login exitoso - Entorno de Desarrollo',
+                environment: isProduction ? 'production' : 'development'
+            });
+        }
+        
+        // Credenciales incorrectas
         res.status(401).json({ 
             success: false, 
-            message: isProduction ? 'Acceso denegado. Credenciales incorrectas.' : 'Usuario o contraseña incorrectos',
-            environment: isProduction ? 'production' : 'development'
+            message: 'Usuario o contraseña incorrectos'
+        });
+        
+    } catch (error) {
+        console.error('Error en login:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error en el servidor' 
         });
     }
 });
@@ -393,6 +426,103 @@ app.get('/api/whatsapp/contact/:phoneNumber', requireAuth, async (req, res) => {
         res.json(contact);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== API USUARIOS ====================
+
+// Get all users
+app.get('/api/usuarios', requireAuth, async (req, res) => {
+    try {
+        const usuarios = await getAllUsers();
+        res.json(usuarios);
+    } catch (error) {
+        console.error('Error obteniendo usuarios:', error);
+        res.status(500).json({ error: 'Error obteniendo usuarios' });
+    }
+});
+
+// Create new user
+app.post('/api/usuarios', requireAuth, async (req, res) => {
+    try {
+        const { username, password, nombre_completo, email, rol } = req.body;
+        
+        // Validar datos requeridos
+        if (!username || !password) {
+            return res.status(400).json({ error: 'Usuario y contraseña son obligatorios' });
+        }
+        
+        // Verificar que el usuario no exista
+        const existingUser = await getUserByUsername(username);
+        if (existingUser) {
+            return res.status(400).json({ error: 'El usuario ya existe' });
+        }
+        
+        // Hash de la contraseña
+        const saltRounds = 10;
+        const passwordHash = await bcrypt.hash(password, saltRounds);
+        
+        // Crear usuario
+        const result = await createUser(username, passwordHash, nombre_completo, email, rol || 'tecnico');
+        
+        res.json({ 
+            success: true, 
+            message: 'Usuario creado exitosamente',
+            id: result.id 
+        });
+    } catch (error) {
+        console.error('Error creando usuario:', error);
+        res.status(500).json({ error: 'Error creando usuario' });
+    }
+});
+
+// Update user
+app.put('/api/usuarios/:id', requireAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nombre_completo, email, rol, activo, password } = req.body;
+        
+        const updateData = { nombre_completo, email, rol, activo };
+        
+        // Si se proporciona nueva contraseña, hashearla
+        if (password) {
+            const saltRounds = 10;
+            updateData.password_hash = await bcrypt.hash(password, saltRounds);
+        }
+        
+        const result = await updateUser(id, updateData);
+        
+        if (result.changes > 0) {
+            res.json({ success: true, message: 'Usuario actualizado exitosamente' });
+        } else {
+            res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+    } catch (error) {
+        console.error('Error actualizando usuario:', error);
+        res.status(500).json({ error: 'Error actualizando usuario' });
+    }
+});
+
+// Delete user
+app.delete('/api/usuarios/:id', requireAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // No permitir eliminar al propio usuario
+        if (req.session.userId == id) {
+            return res.status(400).json({ error: 'No puedes eliminarte a ti mismo' });
+        }
+        
+        const result = await deleteUser(id);
+        
+        if (result.changes > 0) {
+            res.json({ success: true, message: 'Usuario eliminado exitosamente' });
+        } else {
+            res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+    } catch (error) {
+        console.error('Error eliminando usuario:', error);
+        res.status(500).json({ error: 'Error eliminando usuario' });
     }
 });
 

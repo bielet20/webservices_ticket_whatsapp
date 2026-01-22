@@ -92,6 +92,27 @@ const initDatabase = () => {
                 }
             });
 
+            // Create users table
+            db.run(`
+                CREATE TABLE IF NOT EXISTS usuarios (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    nombre_completo TEXT,
+                    email TEXT,
+                    rol TEXT DEFAULT 'tecnico',
+                    activo INTEGER DEFAULT 1,
+                    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    ultimo_acceso DATETIME
+                )
+            `, (err) => {
+                if (err) {
+                    console.error('Error creating usuarios table:', err);
+                } else {
+                    console.log('✓ Tabla de usuarios creada/verificada');
+                }
+            });
+
             // Insert default services if table is empty
             db.get('SELECT COUNT(*) as count FROM servicios', (err, row) => {
                 if (!err && row.count === 0) {
@@ -281,6 +302,122 @@ const getWhatsAppContacts = (ticketId) => {
     });
 };
 
+// ==================== USUARIOS ====================
+
+// Get all users
+const getAllUsers = () => {
+    return new Promise((resolve, reject) => {
+        const sql = 'SELECT id, username, nombre_completo, email, rol, activo, fecha_creacion, ultimo_acceso FROM usuarios ORDER BY username';
+        db.all(sql, [], (err, rows) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(rows);
+            }
+        });
+    });
+};
+
+// Get user by username
+const getUserByUsername = (username) => {
+    return new Promise((resolve, reject) => {
+        const sql = 'SELECT * FROM usuarios WHERE username = ?';
+        db.get(sql, [username], (err, row) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(row);
+            }
+        });
+    });
+};
+
+// Create user
+const createUser = (username, passwordHash, nombreCompleto, email, rol = 'tecnico') => {
+    return new Promise((resolve, reject) => {
+        const sql = 'INSERT INTO usuarios (username, password_hash, nombre_completo, email, rol) VALUES (?, ?, ?, ?, ?)';
+        db.run(sql, [username, passwordHash, nombreCompleto, email, rol], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ id: this.lastID });
+            }
+        });
+    });
+};
+
+// Update user
+const updateUser = (id, data) => {
+    return new Promise((resolve, reject) => {
+        const fields = [];
+        const values = [];
+        
+        if (data.nombre_completo !== undefined) {
+            fields.push('nombre_completo = ?');
+            values.push(data.nombre_completo);
+        }
+        if (data.email !== undefined) {
+            fields.push('email = ?');
+            values.push(data.email);
+        }
+        if (data.rol !== undefined) {
+            fields.push('rol = ?');
+            values.push(data.rol);
+        }
+        if (data.activo !== undefined) {
+            fields.push('activo = ?');
+            values.push(data.activo);
+        }
+        if (data.password_hash !== undefined) {
+            fields.push('password_hash = ?');
+            values.push(data.password_hash);
+        }
+        
+        if (fields.length === 0) {
+            return resolve({ changes: 0 });
+        }
+        
+        values.push(id);
+        const sql = `UPDATE usuarios SET ${fields.join(', ')} WHERE id = ?`;
+        
+        db.run(sql, values, function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
+
+// Update last access
+const updateUserLastAccess = (username) => {
+    return new Promise((resolve, reject) => {
+        const sql = 'UPDATE usuarios SET ultimo_acceso = CURRENT_TIMESTAMP WHERE username = ?';
+        db.run(sql, [username], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
+
+// Delete user
+const deleteUser = (id) => {
+    return new Promise((resolve, reject) => {
+        const sql = 'DELETE FROM usuarios WHERE id = ?';
+        db.run(sql, [id], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
+
 module.exports = {
     db,
     initDatabase,
@@ -293,5 +430,11 @@ module.exports = {
     getTicketNotes,
     assignTechnician,
     registerWhatsAppContact,
-    getWhatsAppContacts
+    getWhatsAppContacts,
+    getAllUsers,
+    getUserByUsername,
+    createUser,
+    updateUser,
+    updateUserLastAccess,
+    deleteUser
 };
