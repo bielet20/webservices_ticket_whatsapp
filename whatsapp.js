@@ -1,5 +1,7 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const fs = require('fs');
+const path = require('path');
 
 class WhatsAppService {
     constructor() {
@@ -9,8 +11,61 @@ class WhatsAppService {
         this.messageHandlers = [];
     }
 
+    // Limpiar archivos de bloqueo de Chromium
+    cleanChromiumLocks() {
+        try {
+            const lockFiles = [
+                '.wwebjs_auth/SingletonLock',
+                '.wwebjs_auth/SingletonSocket',
+                '.wwebjs_auth/SingletonCookie'
+            ];
+            
+            lockFiles.forEach(lockFile => {
+                const lockPath = path.join(process.cwd(), lockFile);
+                if (fs.existsSync(lockPath)) {
+                    try {
+                        fs.unlinkSync(lockPath);
+                        console.log(`🧹 Limpiado lock file: ${lockFile}`);
+                    } catch (err) {
+                        // Ignorar errores de limpieza
+                    }
+                }
+            });
+            
+            // También limpiar locks dentro de session folders
+            const authPath = path.join(process.cwd(), '.wwebjs_auth');
+            if (fs.existsSync(authPath)) {
+                const sessions = fs.readdirSync(authPath);
+                sessions.forEach(session => {
+                    const sessionPath = path.join(authPath, session);
+                    if (fs.statSync(sessionPath).isDirectory()) {
+                        const sessionLocks = [
+                            path.join(sessionPath, 'SingletonLock'),
+                            path.join(sessionPath, 'SingletonSocket'),
+                            path.join(sessionPath, 'SingletonCookie')
+                        ];
+                        sessionLocks.forEach(lockPath => {
+                            if (fs.existsSync(lockPath)) {
+                                try {
+                                    fs.unlinkSync(lockPath);
+                                } catch (err) {
+                                    // Ignorar errores
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+        } catch (error) {
+            console.warn('⚠️ No se pudo limpiar locks de Chromium:', error.message);
+        }
+    }
+
     initialize() {
         console.log('🔄 Inicializando cliente de WhatsApp...');
+        
+        // Limpiar archivos de bloqueo antes de iniciar
+        this.cleanChromiumLocks();
         
         this.client = new Client({
             authStrategy: new LocalAuth({
@@ -25,7 +80,12 @@ class WhatsAppService {
                     '--disable-accelerated-2d-canvas',
                     '--no-first-run',
                     '--no-zygote',
-                    '--disable-gpu'
+                    '--disable-gpu',
+                    '--disable-session-crashed-bubble',
+                    '--disable-infobars',
+                    '--disable-features=site-per-process',
+                    '--disable-web-security',
+                    '--disable-blink-features=AutomationControlled'
                 ]
             }
         });
