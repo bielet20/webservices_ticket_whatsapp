@@ -70,7 +70,9 @@ class WhatsAppService {
         this.retryAttempt = retryCount;
         this.isRetrying = retryCount > 0;
         
-        const delay = Math.min(1000 * Math.pow(2, retryCount), 30000); // Max 30 segundos
+        // Delay más largo para dar tiempo a que el contenedor viejo se cierre en rolling updates
+        // 1er retry: 10s, 2do: 20s, 3ro: 40s, 4to: 60s, 5to: 60s
+        const delay = retryCount === 0 ? 0 : Math.min(10000 * Math.pow(2, retryCount - 1), 60000);
         
         if (retryCount > 0) {
             console.log(`⏳ Reintentando inicialización de WhatsApp en ${delay/1000}s (intento ${retryCount + 1}/${maxRetries + 1})...`);
