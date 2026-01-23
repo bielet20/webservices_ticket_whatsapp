@@ -60,21 +60,15 @@ initDatabase()
         console.error('Error al inicializar la base de datos:', err);
     });
 
-// NO inicializar WhatsApp inmediatamente - se iniciará después del primer healthcheck
-// Esto evita conflictos durante rolling updates en Coolify
+// NO inicializar WhatsApp automáticamente - solo cuando el usuario lo necesite
+// Esto evita completamente conflictos durante rolling updates en Coolify
 let whatsappInitialized = false;
 
 function initializeWhatsAppDelayed() {
     if (!whatsappInitialized) {
-        console.log('🕐 Programando inicialización de WhatsApp...');
+        console.log('🔄 Usuario solicitó WhatsApp - Inicializando...');
         whatsappInitialized = true;
-        
-        // Dar 60 segundos para que Coolify detecte el nuevo contenedor como healthy,
-        // cierre completamente el viejo, y libere todos los recursos de WhatsApp
-        setTimeout(() => {
-            console.log('🔄 Iniciando WhatsApp Web...');
-            whatsappService.initialize();
-        }, 60000); // 60 segundos de delay
+        whatsappService.initialize();
     }
 }
 
@@ -393,7 +387,15 @@ app.get('/api/whatsapp/status', requireAuth, (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-
+// Initialize WhatsApp on demand (when user opens panel)
+app.post('/api/whatsapp/initialize', requireAuth, (req, res) => {
+    try {
+        initializeWhatsAppDelayed();
+        res.json({ success: true, message: 'WhatsApp inicializándose...' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 // Send WhatsApp message
 app.post('/api/whatsapp/send', requireAuth, async (req, res) => {
     try {
@@ -553,11 +555,7 @@ app.delete('/api/usuarios/:id', requireAuth, async (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-    // Inicializar WhatsApp después del primer healthcheck exitoso
-    // Esto permite que Coolify marque el contenedor como healthy y cierre el viejo
-    // antes de que WhatsApp intente acceder a la sesión compartida
-    initializeWhatsAppDelayed();
-    
+    // No inicializar WhatsApp automáticamente - esperar a que el usuario lo solicite
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 

@@ -1641,6 +1641,10 @@
             if (panel.style.display === 'none') {
                 panel.style.display = 'block';
                 btnText.textContent = 'Cerrar WhatsApp Web';
+                
+                // Inicializar WhatsApp cuando el usuario abre el panel por primera vez
+                initializeWhatsApp();
+                
                 checkWhatsAppStatus();
                 if (!whatsappStatusInterval) {
                     whatsappStatusInterval = setInterval(checkWhatsAppStatus, 5000);
@@ -1658,6 +1662,15 @@
                 }
                 currentChatId = null;
                 chatsLoaded = false;
+            }
+        }
+
+        // Initialize WhatsApp on demand (first time user opens panel)
+        async function initializeWhatsApp() {
+            try {
+                await fetch('/api/whatsapp/initialize', { method: 'POST' });
+            } catch (error) {
+                console.error('Error al inicializar WhatsApp:', error);
             }
         }
 
