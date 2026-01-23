@@ -31,14 +31,14 @@ RUN npm ci --only=production && \
     npm cache clean --force
 
 # Copiar código de la aplicación
-COPY --chown=nodejs:nodejs . .
+COPY . .
 
 # Crear directorios necesarios con permisos correctos
-RUN mkdir -p .wwebjs_auth .wwebjs_cache && \
-    chown -R nodejs:nodejs /app
+RUN mkdir -p .wwebjs_auth .wwebjs_cache data && \
+    chmod -R 777 /app/.wwebjs_auth /app/.wwebjs_cache /app/data
 
-# Cambiar a usuario no-root
-USER nodejs
+# Nota: En Coolify, corremos como root para evitar problemas de permisos con volumenes
+# USER nodejs
 
 # Exponer puerto (Coolify detecta automáticamente)
 EXPOSE 3000
