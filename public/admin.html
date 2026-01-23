@@ -1623,6 +1623,7 @@
         let currentChatId = null;
         let whatsappStatusInterval = null;
         let chatRefreshInterval = null;
+        let chatsLoaded = false;
 
         // Toggle WhatsApp Panel
         function toggleWhatsAppPanel() {
@@ -1648,6 +1649,7 @@
                     chatRefreshInterval = null;
                 }
                 currentChatId = null;
+                chatsLoaded = false;
             }
         }
 
@@ -1665,9 +1667,10 @@
                     statusDot.classList.add('connected');
                     statusText.textContent = 'Conectado';
                     
-                    // Solo cargar chats si no hay uno seleccionado o es la primera vez
-                    if (!currentChatId) {
+                    // Solo cargar chats la primera vez
+                    if (!chatsLoaded) {
                         loadWhatsAppChats();
+                        chatsLoaded = true;
                     }
                 } else if (status.hasQR && status.qrCode) {
                     statusDot.classList.remove('connected');
