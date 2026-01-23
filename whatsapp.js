@@ -301,12 +301,41 @@ class WhatsAppService {
         };
     }
 
-    // Cerrar sesión
+    // Cerrar sesión y reinicializar para nuevo QR
     async logout() {
-        if (this.client) {
-            await this.client.logout();
+        try {
+            console.log('🔄 Cerrando sesión de WhatsApp...');
+            
+            if (this.client) {
+                // Destruir cliente actual
+                await this.client.destroy();
+                this.client = null;
+            }
+            
+            // Resetear estado
             this.isReady = false;
             this.qrCode = null;
+            this.isRetrying = false;
+            this.retryAttempt = 0;
+            this.lastError = null;
+            
+            // Limpiar archivos de sesión para forzar nuevo QR
+            const authPath = path.join(process.cwd(), '.wwebjs_auth');
+            if (fs.existsSync(authPath)) {
+                console.log('🧹 Limpiando archivos de sesión...');
+                fs.rmSync(authPath, { recursive: true, force: true });
+            }
+            
+            console.log('✅ Sesión cerrada. Reinicializando...');
+            
+            // Reinicializar para mostrar nuevo QR
+            setTimeout(() => {
+                this.initialize();
+            }, 2000);
+            
+        } catch (error) {
+            console.error('❌ Error al cerrar sesión:', error);
+            throw error;
         }
     }
 
