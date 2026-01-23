@@ -60,13 +60,22 @@ initDatabase()
         console.error('Error al inicializar la base de datos:', err);
     });
 
-// NO inicializar WhatsApp automáticamente - solo cuando el usuario lo necesite
-// Esto evita completamente conflictos durante rolling updates en Coolify
+// Inicializar WhatsApp automáticamente después de 90 segundos del arranque
+// Esto da tiempo suficiente para que Coolify cierre el contenedor viejo en rolling updates
 let whatsappInitialized = false;
+
+console.log('⏰ WhatsApp se inicializará automáticamente en 90 segundos...');
+setTimeout(() => {
+    if (!whatsappInitialized) {
+        console.log('🔄 Iniciando WhatsApp Web automáticamente...');
+        whatsappInitialized = true;
+        whatsappService.initialize();
+    }
+}, 90000); // 90 segundos
 
 function initializeWhatsAppDelayed() {
     if (!whatsappInitialized) {
-        console.log('🔄 Usuario solicitó WhatsApp - Inicializando...');
+        console.log('🔄 Usuario solicitó WhatsApp - Inicializando inmediatamente...');
         whatsappInitialized = true;
         whatsappService.initialize();
     }
