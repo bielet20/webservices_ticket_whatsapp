@@ -908,6 +908,9 @@
                         <span class="status-dot" id="statusDot"></span>
                         <span id="statusText">Desconectado</span>
                     </div>
+                    <button class="btn btn-warning" onclick="logoutWhatsApp()" style="padding: 0.5rem 1rem; background: #FFA500; border: none; color: white; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                    </button>
                     <button class="toggle-whatsapp" onclick="toggleWhatsAppPanel()">
                         <i class="fas fa-times"></i> Cerrar
                     </button>
@@ -1899,6 +1902,32 @@
             } catch (error) {
                 console.error('Error:', error);
                 alert('Error al enviar mensaje');
+            }
+        }
+
+        // Logout from WhatsApp
+        async function logoutWhatsApp() {
+            if (!confirm('¿Estás seguro de cerrar la sesión de WhatsApp? Tendrás que escanear el QR nuevamente para volver a vincular.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/whatsapp/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('Sesión cerrada exitosamente. La página se recargará.');
+                    location.reload();
+                } else {
+                    alert('Error al cerrar sesión: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al cerrar sesión de WhatsApp');
             }
         }
 

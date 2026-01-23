@@ -433,6 +433,16 @@ app.get('/api/whatsapp/chats/:chatId/messages', requireAuth, async (req, res) =>
     }
 });
 
+// Logout from WhatsApp (close session)
+app.post('/api/whatsapp/logout', requireAuth, async (req, res) => {
+    try {
+        await whatsappService.logout();
+        res.json({ success: true, message: 'Sesión de WhatsApp cerrada. Escanee el QR nuevamente para vincular.' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Get contact info
 app.get('/api/whatsapp/contact/:phoneNumber', requireAuth, async (req, res) => {
     try {
