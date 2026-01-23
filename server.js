@@ -11,12 +11,19 @@ const {
     getAllTickets, 
     getTicketById,
     updateTicketStatus,
+    updateTicket,
+    deleteTicket,
     getTicketsByStatus,
     addNoteToTicket,
+    deleteNote,
     getTicketNotes,
     assignTechnician,
     registerWhatsAppContact,
     getWhatsAppContacts,
+    getAllServices,
+    createService,
+    updateService,
+    deleteService,
     getAllUsers,
     getUserByUsername,
     createUser,
@@ -326,6 +333,59 @@ app.patch('/api/tickets/:ticketId/assign', requireAuth, async (req, res) => {
     }
 });
 
+// Update complete ticket (admin edit)
+app.put('/api/tickets/:ticketId', requireAuth, async (req, res) => {
+    try {
+        const { ticketId } = req.params;
+        const ticketData = req.body;
+        
+        const result = await updateTicket(ticketId, ticketData);
+        
+        if (result.changes > 0) {
+            res.json({ success: true, message: 'Ticket actualizado exitosamente' });
+        } else {
+            res.status(404).json({ error: 'Ticket no encontrado' });
+        }
+    } catch (error) {
+        console.error('Error al actualizar ticket:', error);
+        res.status(500).json({ error: 'Error al actualizar ticket' });
+    }
+});
+
+// Delete ticket (admin only)
+app.delete('/api/tickets/:ticketId', requireAuth, async (req, res) => {
+    try {
+        const { ticketId } = req.params;
+        const result = await deleteTicket(ticketId);
+        
+        if (result.changes > 0) {
+            res.json({ success: true, message: 'Ticket eliminado exitosamente' });
+        } else {
+            res.status(404).json({ error: 'Ticket no encontrado' });
+        }
+    } catch (error) {
+        console.error('Error al eliminar ticket:', error);
+        res.status(500).json({ error: 'Error al eliminar ticket' });
+    }
+});
+
+// Delete note
+app.delete('/api/notes/:noteId', requireAuth, async (req, res) => {
+    try {
+        const { noteId } = req.params;
+        const result = await deleteNote(noteId);
+        
+        if (result.changes > 0) {
+            res.json({ success: true, message: 'Nota eliminada exitosamente' });
+        } else {
+            res.status(404).json({ error: 'Nota no encontrada' });
+        }
+    } catch (error) {
+        console.error('Error al eliminar nota:', error);
+        res.status(500).json({ error: 'Error al eliminar nota' });
+    }
+});
+
 // Register WhatsApp contact
 app.post('/api/tickets/:ticketId/whatsapp', requireAuth, async (req, res) => {
     try {
@@ -357,11 +417,76 @@ app.get('/admin', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// ====================================
-// WhatsApp Web API Routes (Protected)
-// ====================================
+// ==================== API SERVICIOS ====================
 
-// Get WhatsApp connection status
+// Get all services
+app.get('/api/servicios', requireAuth, async (req, res) => {
+    try {
+        const servicios = await getAllServices();
+        res.json(servicios);
+    } catch (error) {
+        console.error('Error obteniendo servicios:', error);
+        res.status(500).json({ error: 'Error obteniendo servicios' });
+    }
+});
+
+// Create service
+app.post('/api/servicios', requireAuth, async (req, res) => {
+    try {
+        const { codigo, nombre, descripcion } = req.body;
+        
+        if (!codigo || !nombre) {
+            return res.status(400).json({ error: 'Código y nombre son requeridos' });
+        }
+        
+        const result = await createService(codigo, nombre, descripcion || '');
+        res.json({ success: true, message: 'Servicio creado exitosamente', id: result.id });
+    } catch (error) {
+        console.error('Error creando servicio:', error);
+        res.status(500).json({ error: 'Error creando servicio' });
+    }
+});
+
+// Update service
+app.put('/api/servicios/:id', requireAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { codigo, nombre, descripcion, activo } = req.body;
+        
+        if (!codigo || !nombre) {
+            return res.status(400).json({ error: 'Código y nombre son requeridos' });
+        }
+        
+        const result = await updateService(id, codigo, nombre, descripcion || '', activo !== undefined ? activo : 1);
+        
+        if (result.changes > 0) {
+            res.json({ success: true, message: 'Servicio actualizado exitosamente' });
+        } else {
+            res.status(404).json({ error: 'Servicio no encontrado' });
+        }
+    } catch (error) {
+        console.error('Error actualizando servicio:', error);
+        res.status(500).json({ error: 'Error actualizando servicio' });
+    }
+});
+
+// Delete service
+app.delete('/api/servicios/:id', requireAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await deleteService(id);
+        
+        if (result.changes > 0) {
+            res.json({ success: true, message: 'Servicio eliminado exitosamente' });
+        } else {
+            res.status(404).json({ error: 'Servicio no encontrado' });
+        }
+    } catch (error) {
+        console.error('Error eliminando servicio:', error);
+        res.status(500).json({ error: 'Error eliminando servicio' });
+    }
+});
+
 // ==================== API USUARIOS ====================
 
 // Get all users

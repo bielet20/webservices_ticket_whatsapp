@@ -225,6 +225,53 @@ const updateTicketStatus = (ticketId, estado) => {
     });
 };
 
+// Update complete ticket (full edit)
+const updateTicket = (ticketId, ticketData) => {
+    return new Promise((resolve, reject) => {
+        const { nombre, email, telefono, servicio, prioridad, descripcion, estado, tecnico_asignado } = ticketData;
+        const sql = `
+            UPDATE tickets 
+            SET nombre = ?, email = ?, telefono = ?, servicio = ?, prioridad = ?, descripcion = ?, estado = ?, tecnico_asignado = ?, fecha_actualizacion = CURRENT_TIMESTAMP 
+            WHERE ticket_id = ?
+        `;
+        db.run(sql, [nombre, email, telefono, servicio, prioridad, descripcion, estado, tecnico_asignado, ticketId], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
+
+// Delete ticket
+const deleteTicket = (ticketId) => {
+    return new Promise((resolve, reject) => {
+        // First delete related notes
+        db.run('DELETE FROM notas WHERE ticket_id = ?', [ticketId], (err1) => {
+            if (err1) {
+                reject(err1);
+                return;
+            }
+            // Then delete related whatsapp contacts
+            db.run('DELETE FROM whatsapp_contactos WHERE ticket_id = ?', [ticketId], (err2) => {
+                if (err2) {
+                    reject(err2);
+                    return;
+                }
+                // Finally delete the ticket
+                db.run('DELETE FROM tickets WHERE ticket_id = ?', [ticketId], function(err3) {
+                    if (err3) {
+                        reject(err3);
+                    } else {
+                        resolve({ changes: this.changes });
+                    }
+                });
+            });
+        });
+    });
+};
+
 // Get tickets by status
 const getTicketsByStatus = (estado) => {
     return new Promise((resolve, reject) => {
@@ -248,6 +295,20 @@ const addNoteToTicket = (ticketId, nota, autor) => {
                 reject(err);
             } else {
                 resolve({ id: this.lastID });
+            }
+        });
+    });
+};
+
+// Delete note
+const deleteNote = (noteId) => {
+    return new Promise((resolve, reject) => {
+        const sql = 'DELETE FROM notas WHERE id = ?';
+        db.run(sql, [noteId], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
             }
         });
     });
@@ -281,7 +342,61 @@ const assignTechnician = (ticketId, tecnico) => {
     });
 };
 
-// Register WhatsApp contact
+// Get all services
+const getAllServices = () => {
+    return new Promise((resolve, reject) => {
+        const sql = 'SELECT * FROM servicios ORDER BY nombre';
+        db.all(sql, [], (err, rows) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(rows);
+            }
+        });
+    });
+};
+
+// Create service
+const createService = (codigo, nombre, descripcion) => {
+    return new Promise((resolve, reject) => {
+        const sql = 'INSERT INTO servicios (codigo, nombre, descripcion, activo) VALUES (?, ?, ?, 1)';
+        db.run(sql, [codigo, nombre, descripcion], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ id: this.lastID });
+            }
+        });
+    });
+};
+
+// Update service
+const updateService = (serviceId, codigo, nombre, descripcion, activo) => {
+    return new Promise((resolve, reject) => {
+        const sql = 'UPDATE servicios SET codigo = ?, nombre = ?, descripcion = ?, activo = ? WHERE id = ?';
+        db.run(sql, [codigo, nombre, descripcion, activo, serviceId], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
+
+// Delete service
+const deleteService = (serviceId) => {
+    return new Promise((resolve, reject) => {
+        const sql = 'DELETE FROM servicios WHERE id = ?';
+        db.run(sql, [serviceId], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
 const registerWhatsAppContact = (ticketId, telefono, mensaje, enviadoPor) => {
     return new Promise((resolve, reject) => {
         const sql = 'INSERT INTO whatsapp_contactos (ticket_id, telefono, mensaje, enviado_por) VALUES (?, ?, ?, ?)';
@@ -432,12 +547,19 @@ module.exports = {
     getAllTickets,
     getTicketById,
     updateTicketStatus,
+    updateTicket,
+    deleteTicket,
     getTicketsByStatus,
     addNoteToTicket,
+    deleteNote,
     getTicketNotes,
     assignTechnician,
     registerWhatsAppContact,
     getWhatsAppContacts,
+    getAllServices,
+    createService,
+    updateService,
+    deleteService,
     getAllUsers,
     getUserByUsername,
     createUser,
