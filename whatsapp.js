@@ -306,18 +306,18 @@ class WhatsAppService {
         try {
             console.log('🔄 Cerrando sesión de WhatsApp...');
             
-            if (this.client) {
-                // Destruir cliente actual
-                await this.client.destroy();
-                this.client = null;
-            }
-            
-            // Resetear estado
+            // Resetear estado PRIMERO para detener cualquier retry en curso
             this.isReady = false;
             this.qrCode = null;
             this.isRetrying = false;
             this.retryAttempt = 0;
             this.lastError = null;
+            
+            if (this.client) {
+                // Destruir cliente actual
+                await this.client.destroy();
+                this.client = null;
+            }
             
             // Esperar 3 segundos para que Chromium libere todos los archivos
             await new Promise(resolve => setTimeout(resolve, 3000));
@@ -352,15 +352,17 @@ class WhatsAppService {
                 }
             }
             
-            console.log('✅ Sesión cerrada. Reinicializando...');
-            
-            // Reinicializar para mostrar nuevo QR
-            setTimeout(() => {
-                this.initialize();
-            }, 1000);
+            console.log('✅ Sesión cerrada completamente');
             
         } catch (error) {
             console.error('❌ Error al cerrar sesión:', error);
+            // Resetear estado de todos modos
+            this.isReady = false;
+            this.qrCode = null;
+            this.isRetrying = false;
+            this.retryAttempt = 0;
+            this.lastError = null;
+            this.client = null;
             throw error;
         }
     }

@@ -1933,11 +1933,26 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    alert('Sesión cerrada exitosamente. La página se recargará.');
-                    location.reload();
+                    // No recargar la página - solo reinicializar WhatsApp
+                    alert('Sesión cerrada exitosamente. Reinicializando WhatsApp...');
+                    
+                    // Esperar 4 segundos para que el servidor complete el logout
+                    await new Promise(resolve => setTimeout(resolve, 4000));
+                    
+                    // Reinicializar WhatsApp para mostrar nuevo QR
+                    await initializeWhatsApp();
+                    
+                    // Esperar 2 segundos más y verificar estado
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    checkWhatsAppStatus();
                 } else {
                     alert('Error al cerrar sesión: ' + result.error);
                 }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al cerrar sesión de WhatsApp');
+            }
+        }
             } catch (error) {
                 console.error('Error:', error);
                 alert('Error al cerrar sesión de WhatsApp');
