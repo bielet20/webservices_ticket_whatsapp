@@ -319,11 +319,37 @@ class WhatsAppService {
             this.retryAttempt = 0;
             this.lastError = null;
             
-            // Limpiar archivos de sesión para forzar nuevo QR
+            // Esperar 3 segundos para que Chromium libere todos los archivos
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Limpiar archivos de sesión de forma segura
             const authPath = path.join(process.cwd(), '.wwebjs_auth');
             if (fs.existsSync(authPath)) {
                 console.log('🧹 Limpiando archivos de sesión...');
-                fs.rmSync(authPath, { recursive: true, force: true });
+                try {
+                    // Intentar eliminar recursivamente con múltiples intentos
+                    let attempts = 0;
+                    const maxAttempts = 5;
+                    
+                    while (attempts < maxAttempts) {
+                        try {
+                            fs.rmSync(authPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 1000 });
+                            console.log('✅ Archivos de sesión eliminados');
+                            break;
+                        } catch (err) {
+                            attempts++;
+                            if (attempts >= maxAttempts) {
+                                console.warn('⚠️ No se pudieron eliminar todos los archivos, pero la sesión fue cerrada');
+                            } else {
+                                console.log(`⏳ Reintentando eliminación (${attempts}/${maxAttempts})...`);
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn('⚠️ Error al limpiar archivos de sesión:', err.message);
+                    // Continuar de todos modos - el destroy ya cerró la sesión
+                }
             }
             
             console.log('✅ Sesión cerrada. Reinicializando...');
@@ -331,7 +357,7 @@ class WhatsAppService {
             // Reinicializar para mostrar nuevo QR
             setTimeout(() => {
                 this.initialize();
-            }, 2000);
+            }, 1000);
             
         } catch (error) {
             console.error('❌ Error al cerrar sesión:', error);
