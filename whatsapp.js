@@ -9,6 +9,10 @@ class WhatsAppService {
         this.isReady = false;
         this.qrCode = null;
         this.messageHandlers = [];
+        this.isRetrying = false;
+        this.retryAttempt = 0;
+        this.maxRetries = 5;
+        this.lastError = null;
     }
 
     // Limpiar archivos de bloqueo de Chromium
@@ -62,6 +66,10 @@ class WhatsAppService {
     }
 
     initialize(retryCount = 0, maxRetries = 5) {
+        this.maxRetries = maxRetries;
+        this.retryAttempt = retryCount;
+        this.isRetrying = retryCount > 0;
+        
         const delay = Math.min(1000 * Math.pow(2, retryCount), 30000); // Max 30 segundos
         
         if (retryCount > 0) {
@@ -74,6 +82,8 @@ class WhatsAppService {
 
     _doInitialize(retryCount, maxRetries) {
         console.log('🔄 Inicializando cliente de WhatsApp...');
+        
+        this.lastError = null;
         
         // Limpiar archivos de bloqueo antes de iniciar
         this.cleanChromiumLocks();
@@ -149,6 +159,7 @@ class WhatsAppService {
         // Inicializar cliente con manejo de errores
         this.client.initialize().catch((error) => {
             console.error('❌ Error al inicializar WhatsApp:', error.message);
+            this.lastError = error.message;
             
             // Si es error de profile lock y no hemos superado el máximo de reintentos
             if (error.message.includes('profile appears to be in use') && retryCount < maxRetries) {
@@ -163,6 +174,7 @@ class WhatsAppService {
             } else {
                 console.error('❌ Máximo de reintentos alcanzado. WhatsApp no se pudo inicializar.');
                 console.log('⚠️ La aplicación continuará funcionando sin WhatsApp.');
+                this.isRetrying = false;
             }
         });
     }
@@ -279,7 +291,11 @@ class WhatsAppService {
             isReady: this.isReady,
             hasQR: !!this.qrCode,
             qrCode: this.qrCode,
-            state: this.client ? this.client.pupPage ? 'connected' : 'initializing' : 'not-initialized'
+            state: this.client ? this.client.pupPage ? 'connected' : 'initializing' : 'not-initialized',
+            isRetrying: this.isRetrying,
+            retryAttempt: this.retryAttempt,
+            maxRetries: this.maxRetries,
+            lastError: this.lastError
         };
     }
 

@@ -691,6 +691,11 @@
             50% { opacity: 0.5; }
         }
 
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         .whatsapp-body {
             display: grid;
             grid-template-columns: 1fr 2fr;
@@ -1678,14 +1683,48 @@
                     showQRCode(status.qrCode);
                 } else {
                     statusDot.classList.remove('connected');
-                    statusText.textContent = 'Desconectado';
-                    whatsappContent.innerHTML = `
-                        <div class="qr-container">
-                            <i class="fab fa-whatsapp" style="font-size: 4rem; color: #25D366;"></i>
-                            <h3>Iniciando WhatsApp...</h3>
-                            <p>Por favor espere...</p>
-                        </div>
-                    `;
+                    
+                    // Mostrar información de retry si está reintentando
+                    if (status.isRetrying) {
+                        statusText.textContent = `Reintentando (${status.retryAttempt + 1}/${status.maxRetries + 1})`;
+                        whatsappContent.innerHTML = `
+                            <div class="qr-container">
+                                <i class="fab fa-whatsapp" style="font-size: 4rem; color: #FFA500;"></i>
+                                <h3>Reintentando conexión...</h3>
+                                <p>Intento ${status.retryAttempt + 1} de ${status.maxRetries + 1}</p>
+                                <p style="color: #6b7280; font-size: 0.9rem; margin-top: 1rem;">
+                                    ${status.lastError ? 'Error: ' + status.lastError.substring(0, 100) : 'Esperando disponibilidad del sistema...'}
+                                </p>
+                                <div style="margin-top: 1rem;">
+                                    <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #25D366; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (status.retryAttempt >= status.maxRetries && status.lastError) {
+                        statusText.textContent = 'Error de conexión';
+                        whatsappContent.innerHTML = `
+                            <div class="qr-container">
+                                <i class="fas fa-exclamation-triangle" style="font-size: 4rem; color: #DC2626;"></i>
+                                <h3>WhatsApp no disponible</h3>
+                                <p>No se pudo conectar después de ${status.maxRetries + 1} intentos</p>
+                                <p style="color: #6b7280; font-size: 0.9rem; margin-top: 1rem;">
+                                    La aplicación continúa funcionando para gestión de tickets.
+                                </p>
+                                <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #25D366; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    Reintentar
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        statusText.textContent = 'Desconectado';
+                        whatsappContent.innerHTML = `
+                            <div class="qr-container">
+                                <i class="fab fa-whatsapp" style="font-size: 4rem; color: #25D366;"></i>
+                                <h3>Iniciando WhatsApp...</h3>
+                                <p>Por favor espere...</p>
+                            </div>
+                        `;
+                    }
                 }
             } catch (error) {
                 console.error('Error al verificar estado de WhatsApp:', error);
