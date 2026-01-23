@@ -741,6 +741,7 @@
         .chat-area {
             display: flex;
             flex-direction: column;
+            height: 100%;
         }
 
         .messages-container {
@@ -748,7 +749,8 @@
             overflow-y: auto;
             padding: 1rem;
             background: #f3f4f6;
-            max-height: 80vh;
+            max-height: calc(80vh - 150px);
+            min-height: 300px;
         }
 
         .message {
