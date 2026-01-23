@@ -1721,14 +1721,24 @@
                         whatsappContent.innerHTML = `
                             <div class="qr-container">
                                 <i class="fas fa-exclamation-triangle" style="font-size: 4rem; color: #DC2626;"></i>
-                                <h3>WhatsApp no disponible</h3>
-                                <p>No se pudo conectar después de ${status.maxRetries + 1} intentos</p>
-                                <p style="color: #6b7280; font-size: 0.9rem; margin-top: 1rem;">
-                                    La aplicación continúa funcionando para gestión de tickets.
+                                <h3>WhatsApp no disponible temporalmente</h3>
+                                <p style="margin: 1rem 0;">Posible causa: Deploy reciente o actualización en curso</p>
+                                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 1rem;">
+                                    Si acabas de hacer un deploy, espera 2-3 minutos y luego:
                                 </p>
-                                <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #25D366; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                    Reintentar
-                                </button>
+                                <ol style="text-align: left; display: inline-block; margin: 1rem 0; color: #6b7280; font-size: 0.9rem;">
+                                    <li>Cierra este panel (botón Cerrar)</li>
+                                    <li>Espera 2 minutos</li>
+                                    <li>Vuelve a abrir "WhatsApp Web"</li>
+                                </ol>
+                                <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: center;">
+                                    <button onclick="logoutWhatsApp()" style="padding: 0.75rem 1.5rem; background: #FFA500; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                                        <i class="fas fa-redo"></i> Reintentar (Cerrar Sesión)
+                                    </button>
+                                    <button onclick="toggleWhatsAppPanel()" style="padding: 0.75rem 1.5rem; background: #6B7280; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                        Cerrar Panel
+                                    </button>
+                                </div>
                             </div>
                         `;
                     } else {
