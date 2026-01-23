@@ -1,8 +1,15 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
+
+// Create data directory if it doesn't exist
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+}
 
 // Create database connection
-const dbPath = path.join(__dirname, 'tickets.db');
+const dbPath = path.join(dataDir, 'tickets.db');
 const db = new sqlite3.Database(dbPath);
 
 // Initialize database
