@@ -44,7 +44,8 @@ RUN mkdir -p .wwebjs_auth .wwebjs_cache data && \
 EXPOSE 3000
 
 # Health check para Coolify (usa 127.0.0.1 en lugar de localhost para forzar IPv4)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# Aumentado start-period a 120s para dar tiempo a reintentos de WhatsApp durante rolling updates
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD curl -f http://127.0.0.1:3000/api/health || exit 1
 
 # Comando de inicio

@@ -61,7 +61,18 @@ class WhatsAppService {
         }
     }
 
-    initialize() {
+    initialize(retryCount = 0, maxRetries = 5) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 30000); // Max 30 segundos
+        
+        if (retryCount > 0) {
+            console.log(`⏳ Reintentando inicialización de WhatsApp en ${delay/1000}s (intento ${retryCount + 1}/${maxRetries + 1})...`);
+            setTimeout(() => this._doInitialize(retryCount, maxRetries), delay);
+        } else {
+            this._doInitialize(retryCount, maxRetries);
+        }
+    }
+
+    _doInitialize(retryCount, maxRetries) {
         console.log('🔄 Inicializando cliente de WhatsApp...');
         
         // Limpiar archivos de bloqueo antes de iniciar
@@ -135,8 +146,25 @@ class WhatsAppService {
             }
         });
 
-        // Inicializar cliente
-        this.client.initialize();
+        // Inicializar cliente con manejo de errores
+        this.client.initialize().catch((error) => {
+            console.error('❌ Error al inicializar WhatsApp:', error.message);
+            
+            // Si es error de profile lock y no hemos superado el máximo de reintentos
+            if (error.message.includes('profile appears to be in use') && retryCount < maxRetries) {
+                console.log('🔄 Detectado conflicto de perfil de Chromium, reintentando...');
+                this.client = null;
+                this.initialize(retryCount + 1, maxRetries);
+            } else if (retryCount < maxRetries) {
+                // Otros errores también reintentar
+                console.log('🔄 Error en inicialización, reintentando...');
+                this.client = null;
+                this.initialize(retryCount + 1, maxRetries);
+            } else {
+                console.error('❌ Máximo de reintentos alcanzado. WhatsApp no se pudo inicializar.');
+                console.log('⚠️ La aplicación continuará funcionando sin WhatsApp.');
+            }
+        });
     }
 
     // Registrar un handler para mensajes entrantes
