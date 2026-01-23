@@ -368,9 +368,33 @@
         .note-header {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             margin-bottom: 0.5rem;
             font-size: 0.85rem;
             color: #6b7280;
+        }
+
+        .note-header div {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+
+        .btn-delete-note {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+        }
+
+        .btn-delete-note:hover {
+            background: #dc2626;
         }
 
         .note-text {
@@ -882,6 +906,9 @@
             <div class="tickets-header">
                 <h2>Lista de Tickets</h2>
                 <div style="display: flex; gap: 1rem;">
+                    <button class="btn-export" onclick="openCreateTicketModal()" style="background: #10b981;">
+                        <i class="fas fa-plus"></i> Crear Nuevo Ticket
+                    </button>
                     <button class="btn-export" onclick="exportToCSV()">
                         <i class="fas fa-download"></i> Exportar CSV
                     </button>
@@ -991,6 +1018,72 @@
         </div>
     </div>
 
+    <!-- Modal for creating tickets -->
+    <div id="createTicketModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Crear Nuevo Ticket</h2>
+                <button class="close-modal" onclick="closeCreateTicketModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form onsubmit="event.preventDefault(); saveNewTicket();">
+                    <div class="form-group">
+                        <label>Cliente (Nombre)</label>
+                        <input type="text" id="createTicketNombre" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="createTicketEmail" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <input type="tel" id="createTicketTelefono" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Servicio</label>
+                        <select id="createTicketServicio" required>
+                            <option value="">Selecciona un servicio...</option>
+                            <option value="reparacion">Reparación de Equipos</option>
+                            <option value="redes">Montaje de Redes</option>
+                            <option value="impresoras">Soporte de Impresoras</option>
+                            <option value="seguridad">Seguridad Informática</option>
+                            <option value="errores">Detección de Errores</option>
+                            <option value="soporte">Soporte Técnico General</option>
+                            <option value="desarrollo_app">Programación de Aplicaciones</option>
+                            <option value="desarrollo_web">Desarrollo de Entornos Web</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Prioridad</label>
+                        <select id="createTicketPrioridad" required>
+                            <option value="baja">Baja</option>
+                            <option value="media">Media</option>
+                            <option value="alta">Alta</option>
+                            <option value="critica">Crítica</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Descripción</label>
+                        <textarea id="createTicketDescripcion" rows="4" required></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+                        <button type="button" class="btn" style="background: #6b7280;" onclick="closeCreateTicketModal()">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="btn" style="background: #10b981;">
+                            <i class="fas fa-plus"></i> Crear Ticket
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     <script>
         let allTickets = [];
         let filteredTickets = [];
@@ -1198,8 +1291,13 @@
                 const notesHtml = notes.length > 0 ? notes.map(note => `
                     <div class="note-item">
                         <div class="note-header">
-                            <strong>${note.autor}</strong>
-                            <span>${new Date(note.fecha_creacion).toLocaleString('es-ES')}</span>
+                            <div>
+                                <strong>${note.autor}</strong>
+                                <span>${new Date(note.fecha_creacion).toLocaleString('es-ES')}</span>
+                            </div>
+                            <button class="btn-delete-note" onclick="deleteNoteFromTicket(${note.id})" title="Eliminar nota">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
                         <div class="note-text">${note.nota}</div>
                     </div>
@@ -1364,6 +1462,8 @@
                 });
                 
                 if (response.ok) {
+                    document.getElementById('nuevaNota').value = '';
+                    document.getElementById('autorNota').value = '';
                     viewTicket(ticketId); // Reload ticket to show new note
                 } else {
                     alert('Error al añadir nota');
@@ -1371,6 +1471,34 @@
             } catch (error) {
                 console.error('Error adding note:', error);
                 alert('Error al añadir nota');
+            }
+        }
+
+        // Delete note
+        async function deleteNoteFromTicket(noteId) {
+            if (!confirm('¿Está seguro que desea eliminar esta nota?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/notes/${noteId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('Nota eliminada exitosamente');
+                    // Reload the current ticket
+                    const ticketId = document.querySelector('input[type="hidden"][id*="ticket"]')?.value;
+                    if (ticketId) {
+                        viewTicket(ticketId);
+                    }
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error al eliminar nota: ' + error.message);
             }
         }
 
@@ -1620,10 +1748,61 @@
             document.getElementById('editTicketModal').style.display = 'none';
         }
 
+        function closeCreateTicketModal() {
+            document.getElementById('createTicketModal').style.display = 'none';
+        }
+
+        function openCreateTicketModal() {
+            document.getElementById('createTicketModal').style.display = 'block';
+        }
+
+        // Create new ticket
+        async function saveNewTicket() {
+            const ticketData = {
+                nombre: document.getElementById('createTicketNombre').value,
+                email: document.getElementById('createTicketEmail').value,
+                telefono: document.getElementById('createTicketTelefono').value,
+                servicio: document.getElementById('createTicketServicio').value,
+                prioridad: document.getElementById('createTicketPrioridad').value,
+                descripcion: document.getElementById('createTicketDescripcion').value
+            };
+            
+            try {
+                const response = await fetch('/api/tickets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ticketData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('Ticket creado exitosamente: ' + result.ticketId);
+                    document.getElementById('createTicketModal').style.display = 'none';
+                    // Clear form
+                    document.getElementById('createTicketNombre').value = '';
+                    document.getElementById('createTicketEmail').value = '';
+                    document.getElementById('createTicketTelefono').value = '';
+                    document.getElementById('createTicketServicio').value = '';
+                    document.getElementById('createTicketPrioridad').value = 'media';
+                    document.getElementById('createTicketDescripcion').value = '';
+                    loadTickets();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error al crear ticket: ' + error.message);
+            }
+        }
+
         window.onclick = function(event) {
-            const modal = document.getElementById('editTicketModal');
-            if (event.target === modal) {
-                modal.style.display = 'none';
+            const ticketModal = document.getElementById('editTicketModal');
+            const createModal = document.getElementById('createTicketModal');
+            if (event.target === ticketModal) {
+                ticketModal.style.display = 'none';
+            }
+            if (event.target === createModal) {
+                createModal.style.display = 'none';
             }
         }
 
