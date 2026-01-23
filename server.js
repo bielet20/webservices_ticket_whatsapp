@@ -60,8 +60,28 @@ initDatabase()
         console.error('Error al inicializar la base de datos:', err);
     });
 
-// Initialize WhatsApp
-whatsappService.initialize();
+// NO inicializar WhatsApp inmediatamente - se iniciará después del primer healthcheck
+// Esto evita conflictos durante rolling updates en Coolify
+let whatsappInitialized = false;
+
+function initializeWhatsAppDelayed() {
+    if (!whatsappInitialized) {
+        console.log('🕐 Inicializando WhatsApp después del arranque del servidor...');
+        whatsappInitialized = true;
+        
+        // Dar 5 segundos adicionales para que Coolify detecte el nuevo contenedor como healthy
+        // y cierre el viejo antes de intentar acceder a la sesión de WhatsApp
+        setTimeout(() => {
+            whatsappService.initialize();
+            
+            // WhatsApp message handler - guardar mensajes entrantes
+            whatsappService.onMessage(async (message) => {
+                console.log('📩 Mensaje recibido:', message.from, '-', message.body);
+                // Aquí puedes agregar lógica para guardar mensajes en la BD si lo necesitas
+            });
+        }, 5000);
+    }
+}
 
 // WhatsApp message handler - guardar mensajes entrantes
 whatsappService.onMessage(async (message) => {
@@ -528,6 +548,11 @@ app.delete('/api/usuarios/:id', requireAuth, async (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
+    // Inicializar WhatsApp después del primer healthcheck exitoso
+    // Esto permite que Coolify marque el contenedor como healthy y cierre el viejo
+    // antes de que WhatsApp intente acceder a la sesión compartida
+    initializeWhatsAppDelayed();
+    
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
