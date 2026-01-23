@@ -30,8 +30,6 @@ const {
     sendNotificationToSupport 
 } = require('./email');
 
-const whatsappService = require('./whatsapp');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -60,32 +58,8 @@ initDatabase()
         console.error('Error al inicializar la base de datos:', err);
     });
 
-// Inicializar WhatsApp automáticamente después de 90 segundos del arranque
-// Esto da tiempo suficiente para que Coolify cierre el contenedor viejo en rolling updates
-let whatsappInitialized = false;
-
-console.log('⏰ WhatsApp se inicializará automáticamente en 90 segundos...');
-setTimeout(() => {
-    if (!whatsappInitialized) {
-        console.log('🔄 Iniciando WhatsApp Web automáticamente...');
-        whatsappInitialized = true;
-        whatsappService.initialize();
-    }
-}, 90000); // 90 segundos
-
-function initializeWhatsAppDelayed() {
-    if (!whatsappInitialized) {
-        console.log('🔄 Usuario solicitó WhatsApp - Inicializando inmediatamente...');
-        whatsappInitialized = true;
-        whatsappService.initialize();
-    }
-}
-
-// WhatsApp message handler - guardar mensajes entrantes
-whatsappService.onMessage(async (message) => {
-    console.log('📩 Mensaje recibido:', message.from, '-', message.body);
-    // Aquí puedes agregar lógica para guardar mensajes en la BD si lo necesitas
-});
+// WhatsApp simplificado: solo enlaces directos a web.whatsapp.com
+// Sin servidor de WhatsApp Web embebido para evitar problemas de Chromium en Docker
 
 // Authentication middleware
 const requireAuth = (req, res, next) => {
@@ -388,83 +362,6 @@ app.get('/admin', requireAuth, (req, res) => {
 // ====================================
 
 // Get WhatsApp connection status
-app.get('/api/whatsapp/status', requireAuth, (req, res) => {
-    try {
-        const status = whatsappService.getStatus();
-        res.json(status);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-// Initialize WhatsApp on demand (when user opens panel)
-app.post('/api/whatsapp/initialize', requireAuth, (req, res) => {
-    try {
-        initializeWhatsAppDelayed();
-        res.json({ success: true, message: 'WhatsApp inicializándose...' });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-// Send WhatsApp message
-app.post('/api/whatsapp/send', requireAuth, async (req, res) => {
-    try {
-        const { phoneNumber, message } = req.body;
-        
-        if (!phoneNumber || !message) {
-            return res.status(400).json({ error: 'Se requiere número de teléfono y mensaje' });
-        }
-        
-        const result = await whatsappService.sendMessage(phoneNumber, message);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get all chats
-app.get('/api/whatsapp/chats', requireAuth, async (req, res) => {
-    try {
-        const chats = await whatsappService.getChats();
-        res.json(chats);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get messages from a specific chat
-app.get('/api/whatsapp/chats/:chatId/messages', requireAuth, async (req, res) => {
-    try {
-        const { chatId } = req.params;
-        const limit = parseInt(req.query.limit) || 50;
-        
-        const messages = await whatsappService.getChatMessages(chatId, limit);
-        res.json(messages);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Logout from WhatsApp (close session)
-app.post('/api/whatsapp/logout', requireAuth, async (req, res) => {
-    try {
-        await whatsappService.logout();
-        res.json({ success: true, message: 'Sesión de WhatsApp cerrada. Escanee el QR nuevamente para vincular.' });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get contact info
-app.get('/api/whatsapp/contact/:phoneNumber', requireAuth, async (req, res) => {
-    try {
-        const { phoneNumber } = req.params;
-        const contact = await whatsappService.getContactInfo(phoneNumber);
-        res.json(contact);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
 // ==================== API USUARIOS ====================
 
 // Get all users

@@ -1,23 +1,14 @@
 # Dockerfile optimizado para Coolify
-# Sistema de tickets con WhatsApp Web integrado
+# Sistema de tickets simplificado
 
 FROM node:18-alpine
 
-# Instalar Chromium y dependencias necesarias
+# Instalar dependencias mínimas del sistema
 RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont \
     sqlite \
     curl
 
-# Configurar Puppeteer para usar Chromium del sistema
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
-    NODE_ENV=production
+ENV NODE_ENV=production
 
 # Crear usuario no-root
 RUN addgroup -g 1001 -S nodejs && \
@@ -33,9 +24,9 @@ RUN npm ci --only=production && \
 # Copiar código de la aplicación
 COPY . .
 
-# Crear directorios necesarios con permisos correctos
-RUN mkdir -p .wwebjs_auth .wwebjs_cache data && \
-    chmod -R 777 /app/.wwebjs_auth /app/.wwebjs_cache /app/data
+# Crear directorio de base de datos con permisos correctos
+RUN mkdir -p data && \
+    chmod -R 777 /app/data
 
 # Nota: En Coolify, corremos como root para evitar problemas de permisos con volumenes
 # USER nodejs
@@ -43,9 +34,8 @@ RUN mkdir -p .wwebjs_auth .wwebjs_cache data && \
 # Exponer puerto (Coolify detecta automáticamente)
 EXPOSE 3000
 
-# Health check para Coolify (usa 127.0.0.1 en lugar de localhost para forzar IPv4)
-# WhatsApp se inicia DESPUÉS del healthcheck para evitar conflictos en rolling updates
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# Health check para Coolify
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://127.0.0.1:3000/api/health || exit 1
 
 # Comando de inicio
