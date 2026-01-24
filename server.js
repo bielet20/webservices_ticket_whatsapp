@@ -1034,7 +1034,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log('\n' + '='.repeat(50));
     console.log('🚀 Servidor de Servicios Informáticos iniciado');
     console.log('='.repeat(50));
