@@ -128,12 +128,26 @@ const initDatabase = () => {
                     activo INTEGER DEFAULT 1,
                     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
                     ultimo_acceso DATETIME
+                );
+                
+                CREATE TABLE IF NOT EXISTS horas_trabajo (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ticket_id TEXT NOT NULL,
+                    usuario_id INTEGER NOT NULL,
+                    tecnico_nombre TEXT NOT NULL,
+                    horas REAL NOT NULL,
+                    descripcion TEXT,
+                    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    registrado_por TEXT NOT NULL,
+                    FOREIGN KEY(ticket_id) REFERENCES tickets(ticket_id),
+                    FOREIGN KEY(usuario_id) REFERENCES usuarios(id)
                 )
             `, (err) => {
                 if (err) {
-                    console.error('Error creating usuarios table:', err);
+                    console.error('Error creating usuarios/horas_trabajo tables:', err);
                 } else {
                     console.log('✓ Tabla de usuarios creada/verificada');
+                    console.log('✓ Tabla de horas de trabajo creada/verificada');
                 }
             });
 
@@ -643,6 +657,104 @@ const deleteUser = (id) => {
     });
 };
 
+// ==================== TRABAJO POR HORAS ====================
+
+// Add hours worked on a ticket
+const addHorasTrabajo = (ticketId, usuarioId, tecnicoNombre, horas, descripcion, registradoPor) => {
+    return new Promise((resolve, reject) => {
+        const sql = `INSERT INTO horas_trabajo 
+            (ticket_id, usuario_id, tecnico_nombre, horas, descripcion, registrado_por) 
+            VALUES (?, ?, ?, ?, ?, ?)`;
+        
+        db.run(sql, [ticketId, usuarioId, tecnicoNombre, horas, descripcion || '', registradoPor], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ id: this.lastID });
+            }
+        });
+    });
+};
+
+// Get hours worked on a ticket
+const getHorasTrabajo = (ticketId) => {
+    return new Promise((resolve, reject) => {
+        const sql = `SELECT * FROM horas_trabajo WHERE ticket_id = ? ORDER BY fecha_registro DESC`;
+        
+        db.all(sql, [ticketId], (err, rows) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(rows || []);
+            }
+        });
+    });
+};
+
+// Get total hours for a ticket
+const getTotalHorasTicket = (ticketId) => {
+    return new Promise((resolve, reject) => {
+        const sql = `SELECT SUM(horas) as total FROM horas_trabajo WHERE ticket_id = ?`;
+        
+        db.get(sql, [ticketId], (err, row) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(row?.total || 0);
+            }
+        });
+    });
+};
+
+// Get hours by technician for a ticket
+const getHorasPorTecnico = (ticketId) => {
+    return new Promise((resolve, reject) => {
+        const sql = `SELECT tecnico_nombre, SUM(horas) as total_horas, COUNT(*) as registros 
+                     FROM horas_trabajo 
+                     WHERE ticket_id = ? 
+                     GROUP BY tecnico_nombre 
+                     ORDER BY total_horas DESC`;
+        
+        db.all(sql, [ticketId], (err, rows) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(rows || []);
+            }
+        });
+    });
+};
+
+// Update hours entry
+const updateHorasTrabajo = (id, horas, descripcion) => {
+    return new Promise((resolve, reject) => {
+        const sql = `UPDATE horas_trabajo SET horas = ?, descripcion = ? WHERE id = ?`;
+        
+        db.run(sql, [horas, descripcion || '', id], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
+
+// Delete hours entry
+const deleteHorasTrabajo = (id) => {
+    return new Promise((resolve, reject) => {
+        const sql = `DELETE FROM horas_trabajo WHERE id = ?`;
+        
+        db.run(sql, [id], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
+
 module.exports = {
     db,
     initDatabase,
@@ -673,5 +785,11 @@ module.exports = {
     createUser,
     updateUser,
     updateUserLastAccess,
-    deleteUser
+    deleteUser,
+    addHorasTrabajo,
+    getHorasTrabajo,
+    getTotalHorasTicket,
+    getHorasPorTecnico,
+    updateHorasTrabajo,
+    deleteHorasTrabajo
 };

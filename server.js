@@ -34,7 +34,13 @@ const {
     createUser,
     updateUser,
     updateUserLastAccess,
-    deleteUser
+    deleteUser,
+    addHorasTrabajo,
+    getHorasTrabajo,
+    getTotalHorasTicket,
+    getHorasPorTecnico,
+    updateHorasTrabajo,
+    deleteHorasTrabajo
 } = require('./database');
 
 const { 
@@ -358,6 +364,98 @@ app.get('/api/tickets/:ticketId/notes', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error al obtener notas:', error);
         res.status(500).json({ error: 'Error al obtener notas' });
+    }
+});
+
+// ==================== HORAS DE TRABAJO ====================
+
+// Add hours worked on ticket
+app.post('/api/tickets/:ticketId/horas', requireAuth, async (req, res) => {
+    try {
+        const { ticketId } = req.params;
+        const { usuarioId, tecnicoNombre, horas, descripcion } = req.body;
+        
+        if (!usuarioId || !tecnicoNombre || !horas) {
+            return res.status(400).json({ error: 'Usuario, técnico y horas son requeridos' });
+        }
+        
+        if (horas <= 0) {
+            return res.status(400).json({ error: 'Las horas deben ser mayor a 0' });
+        }
+        
+        const result = await addHorasTrabajo(
+            ticketId,
+            usuarioId,
+            tecnicoNombre,
+            horas,
+            descripcion,
+            req.session.username
+        );
+        
+        res.json({ 
+            success: true, 
+            message: 'Horas registradas exitosamente',
+            id: result.id 
+        });
+    } catch (error) {
+        console.error('Error registrando horas:', error);
+        res.status(500).json({ error: 'Error registrando horas' });
+    }
+});
+
+// Get hours worked on ticket
+app.get('/api/tickets/:ticketId/horas', requireAuth, async (req, res) => {
+    try {
+        const horas = await getHorasTrabajo(req.params.ticketId);
+        const total = await getTotalHorasTicket(req.params.ticketId);
+        const porTecnico = await getHorasPorTecnico(req.params.ticketId);
+        
+        res.json({
+            horas: horas,
+            total: total,
+            porTecnico: porTecnico
+        });
+    } catch (error) {
+        console.error('Error al obtener horas:', error);
+        res.status(500).json({ error: 'Error al obtener horas' });
+    }
+});
+
+// Update hours entry
+app.put('/api/tickets/horas/:id', requireAuth, async (req, res) => {
+    try {
+        const { horas, descripcion } = req.body;
+        
+        if (!horas || horas <= 0) {
+            return res.status(400).json({ error: 'Las horas deben ser mayor a 0' });
+        }
+        
+        const result = await updateHorasTrabajo(req.params.id, horas, descripcion);
+        
+        if (result.changes > 0) {
+            res.json({ success: true, message: 'Horas actualizadas' });
+        } else {
+            res.status(404).json({ error: 'Registro de horas no encontrado' });
+        }
+    } catch (error) {
+        console.error('Error actualizando horas:', error);
+        res.status(500).json({ error: 'Error actualizando horas' });
+    }
+});
+
+// Delete hours entry
+app.delete('/api/tickets/horas/:id', requireAdmin, async (req, res) => {
+    try {
+        const result = await deleteHorasTrabajo(req.params.id);
+        
+        if (result.changes > 0) {
+            res.json({ success: true, message: 'Registro de horas eliminado' });
+        } else {
+            res.status(404).json({ error: 'Registro de horas no encontrado' });
+        }
+    } catch (error) {
+        console.error('Error eliminando horas:', error);
+        res.status(500).json({ error: 'Error eliminando horas' });
     }
 });
 
