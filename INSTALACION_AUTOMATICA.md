@@ -285,6 +285,43 @@ Si encuentras problemas:
 3. **Usa HTTPS** en producción (con un reverse proxy como nginx o Caddy)
 4. **Actualiza regularmente** el sistema
 
+## 🕐 Sistema de Horas de Trabajo
+
+El sistema ahora permite registrar y trackear las horas trabajadas en cada ticket por los técnicos.
+
+### Características:
+
+- ✅ Registro de horas por técnico en cada ticket
+- ✅ Descripción del trabajo realizado
+- ✅ Total de horas por ticket
+- ✅ Desglose por técnico (cuántas horas dedicó cada uno)
+- ✅ Disponible para técnicos y administradores
+- ✅ Eliminación de registros (solo admins)
+
+### Cómo usar:
+
+1. **Abre un ticket** desde el panel de admin
+2. **Busca la sección "Horas de Trabajo"**
+3. **Ingresa:**
+   - ID del usuario técnico
+   - Nombre del técnico
+   - Horas trabajadas (ej: 1, 0.5, 1.25)
+   - Descripción del trabajo (opcional)
+4. **Haz clic en "Registrar Horas"**
+5. **Verás automáticamente:**
+   - Total de horas en el ticket
+   - Desglose por cada técnico
+   - Historial completo con fechas
+
+### Ejemplo:
+
+```
+Ticket #TKT-ABC-123
+├─ Juan Pérez: 2h (2 registros)
+├─ María García: 1.5h (1 registro)
+└─ Total: 3.5h
+```
+
 ## Producción
 
 Para producción en un servidor:
