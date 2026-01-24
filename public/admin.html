@@ -2267,6 +2267,7 @@
             document.getElementById('backupFileInput').value = '';
         }
 
+        async function loadUsers() {
             try {
                 const response = await fetch('/api/usuarios');
                 const users = await response.json();
