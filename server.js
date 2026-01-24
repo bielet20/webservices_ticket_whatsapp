@@ -481,6 +481,11 @@ app.get('/admin', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
+// Setup panel route (para cambiar credenciales)
+app.get('/setup', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'setup.html'));
+});
+
 // ==================== API SERVICIOS ====================
 
 // Get all services
@@ -669,6 +674,90 @@ app.get('/api/session', (req, res) => {
             rol: null,
             isAdmin: false
         });
+    }
+});
+
+// Update production credentials (admin password)
+app.post('/api/setup/update-admin-password', async (req, res) => {
+    try {
+        const { currentPassword, newPassword, confirmPassword } = req.body;
+        
+        // Validar contraseña actual
+        if (!currentPassword || currentPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) {
+            return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+        }
+        
+        // Validar nueva contraseña
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+        }
+        
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ error: 'Las contraseñas no coinciden' });
+        }
+        
+        // Actualizar contraseña en la base de datos
+        const adminUser = await getUserByUsername('admin');
+        if (!adminUser) {
+            return res.status(500).json({ error: 'Usuario admin no encontrado' });
+        }
+        
+        const saltRounds = 10;
+        const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+        
+        await updateUser(adminUser.id, { password_hash: passwordHash });
+        
+        res.json({ 
+            success: true, 
+            message: 'Contraseña del admin actualizada exitosamente'
+        });
+    } catch (error) {
+        console.error('Error actualizando contraseña:', error);
+        res.status(500).json({ error: 'Error actualizando contraseña' });
+    }
+});
+
+// Create Root user (one-time setup)
+app.post('/api/setup/create-root-user', async (req, res) => {
+    try {
+        const { adminPassword, rootPassword } = req.body;
+        
+        // Validar contraseña admin
+        if (!adminPassword || adminPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) {
+            return res.status(401).json({ error: 'Contraseña admin incorrecta' });
+        }
+        
+        // Verificar si Root ya existe
+        const existingRoot = await getUserByUsername('Root');
+        if (existingRoot) {
+            return res.status(400).json({ error: 'El usuario Root ya existe' });
+        }
+        
+        // Validar contraseña de Root
+        if (!rootPassword || rootPassword.length < 6) {
+            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+        }
+        
+        // Crear usuario Root
+        const saltRounds = 10;
+        const rootHash = await bcrypt.hash(rootPassword, saltRounds);
+        
+        const newRoot = await createUser(
+            'Root',
+            rootHash,
+            'Root Administrator',
+            'root@admin.local',
+            'admin'
+        );
+        
+        res.json({ 
+            success: true, 
+            message: 'Usuario Root creado exitosamente',
+            id: newRoot.id
+        });
+    } catch (error) {
+        console.error('Error creando usuario Root:', error);
+        res.status(500).json({ error: 'Error creando usuario Root' });
     }
 });
 
