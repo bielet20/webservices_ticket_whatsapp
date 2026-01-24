@@ -654,6 +654,24 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Get session info (verificar rol del usuario actual)
+app.get('/api/session', (req, res) => {
+    if (req.session && req.session.authenticated) {
+        res.json({
+            authenticated: true,
+            username: req.session.username,
+            rol: req.session.rol,
+            isAdmin: req.session.rol === 'admin'
+        });
+    } else {
+        res.json({
+            authenticated: false,
+            rol: null,
+            isAdmin: false
+        });
+    }
+});
+
 // Debug endpoint (solo para verificar configuración)
 app.get('/api/config-check', (req, res) => {
     const username = process.env.ADMIN_USERNAME || 'admin';

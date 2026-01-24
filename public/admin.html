@@ -1097,11 +1097,51 @@
         let currentServicioFilter = 'todos';
         let currentPrioridadFilter = 'todos';
 
+        let currentUserRole = null;
+        let isAdmin = false;
+
         // Load tickets on page load
         document.addEventListener('DOMContentLoaded', () => {
+            checkUserRole();
             loadTickets();
             setupEventListeners();
         });
+
+        // Check current user role
+        async function checkUserRole() {
+            try {
+                const response = await fetch('/api/session');
+                const session = await response.json();
+                
+                currentUserRole = session.rol;
+                isAdmin = session.isAdmin;
+                
+                applyPermissions();
+            } catch (error) {
+                console.error('Error checking user role:', error);
+            }
+        }
+
+        // Apply permissions based on user role
+        function applyPermissions() {
+            if (!isAdmin) {
+                // Ocultar botones de admin
+                const archivedBtn = document.querySelector('button[onclick*="loadArchivedTickets"]');
+                if (archivedBtn) {
+                    archivedBtn.style.display = 'none';
+                }
+                
+                // Ocultar todos los botones de delete
+                document.querySelectorAll('.btn-delete').forEach(btn => btn.style.display = 'none');
+                document.querySelectorAll('.btn-delete-note').forEach(btn => btn.style.display = 'none');
+                
+                // Ocultar botones en la tabla de usuarios
+                document.querySelectorAll('button[onclick*="deleteUser"]').forEach(btn => btn.style.display = 'none');
+                document.querySelectorAll('button[onclick*="editUser"]').forEach(btn => btn.style.display = 'none');
+                document.querySelectorAll('button[onclick*="deleteService"]').forEach(btn => btn.style.display = 'none');
+                document.querySelectorAll('button[onclick*="editService"]').forEach(btn => btn.style.display = 'none');
+            }
+        }
 
         function setupEventListeners() {
             // Filter buttons
@@ -1246,6 +1286,7 @@
             `;
             
             container.innerHTML = html;
+            applyPermissions();
         }
 
         function updateStatistics() {
@@ -1300,6 +1341,7 @@
                         <p>No hay tickets para mostrar</p>
                     </div>
                 `;
+                applyPermissions();
                 return;
             }
 
@@ -1360,6 +1402,7 @@
             `;
             
             container.innerHTML = html;
+            applyPermissions();
         }
 
         async function viewTicket(ticketId) {
@@ -1954,6 +1997,7 @@
                             </td>
                         </tr>
                     `;
+                    applyPermissions();
                     return;
                 }
                 
@@ -1985,6 +2029,7 @@
                         </td>
                     </tr>
                 `).join('');
+                applyPermissions();
             } catch (error) {
                 console.error('Error cargando usuarios:', error);
                 alert('Error al cargar usuarios');
