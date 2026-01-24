@@ -399,7 +399,7 @@ app.post('/api/tickets/:ticketId/horas', requireAuth, async (req, res) => {
         });
     } catch (error) {
         console.error('Error registrando horas:', error);
-        res.status(500).json({ error: 'Error registrando horas' });
+        res.status(500).json({ error: 'Error registrando horas: ' + error.message });
     }
 });
 
@@ -411,13 +411,13 @@ app.get('/api/tickets/:ticketId/horas', requireAuth, async (req, res) => {
         const porTecnico = await getHorasPorTecnico(req.params.ticketId);
         
         res.json({
-            horas: horas,
-            total: total,
-            porTecnico: porTecnico
+            horas: horas || [],
+            total: total || 0,
+            porTecnico: porTecnico || []
         });
     } catch (error) {
         console.error('Error al obtener horas:', error);
-        res.status(500).json({ error: 'Error al obtener horas' });
+        res.status(500).json({ error: 'Error al obtener horas: ' + error.message });
     }
 });
 
@@ -829,6 +829,35 @@ app.get('/api/setup/check', async (req, res) => {
         });
     } catch (error) {
         console.error('Error en setup check:', error);
+        res.status(500).json({ 
+            status: 'error',
+            message: error.message 
+        });
+    }
+});
+
+// Diagnostic endpoint for work hours table
+app.get('/api/diagnostics/horas', async (req, res) => {
+    try {
+        const { db } = require('./database');
+        
+        // Check if table exists
+        const tableCheck = new Promise((resolve) => {
+            db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='horas_trabajo'`, (err, row) => {
+                resolve({ tableExists: !!row, error: err ? err.message : null });
+            });
+        });
+        
+        const result = await tableCheck;
+        
+        res.json({
+            status: result.tableExists ? 'ok' : 'missing',
+            horasTableExists: result.tableExists,
+            message: result.tableExists ? 'Tabla horas_trabajo existe' : 'Tabla horas_trabajo NO existe - intentando crear...',
+            error: result.error
+        });
+    } catch (error) {
+        console.error('Error en diagnostics horas:', error);
         res.status(500).json({ 
             status: 'error',
             message: error.message 

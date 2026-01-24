@@ -128,8 +128,17 @@ const initDatabase = () => {
                     activo INTEGER DEFAULT 1,
                     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
                     ultimo_acceso DATETIME
-                );
-                
+                )
+            `, (err) => {
+                if (err) {
+                    console.error('Error creating usuarios table:', err);
+                } else {
+                    console.log('✓ Tabla de usuarios creada/verificada');
+                }
+            });
+            
+            // Create horas_trabajo table separately
+            db.run(`
                 CREATE TABLE IF NOT EXISTS horas_trabajo (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     ticket_id TEXT NOT NULL,
@@ -143,10 +152,9 @@ const initDatabase = () => {
                     FOREIGN KEY(usuario_id) REFERENCES usuarios(id)
                 )
             `, (err) => {
-                if (err) {
-                    console.error('Error creating usuarios/horas_trabajo tables:', err);
-                } else {
-                    console.log('✓ Tabla de usuarios creada/verificada');
+                if (err && !err.message.includes('already exists')) {
+                    console.error('Error creating horas_trabajo table:', err);
+                } else if (!err) {
                     console.log('✓ Tabla de horas de trabajo creada/verificada');
                 }
             });
