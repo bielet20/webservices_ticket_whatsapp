@@ -51,19 +51,6 @@ const {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Determine if we're in production/HTTPS
-const isProduction = process.env.NODE_ENV === 'production';
-const isHTTPS = process.env.FORCE_HTTPS === 'true' || isProduction;
-
-// Middleware for HTTPS redirection (for Coolify and reverse proxies)
-app.use((req, res, next) => {
-    // Check if request came through a reverse proxy (X-Forwarded-Proto header)
-    if (req.headers['x-forwarded-proto'] && req.headers['x-forwarded-proto'] !== 'https' && isHTTPS) {
-        return res.redirect(301, `https://${req.headers.host}${req.url}`);
-    }
-    next();
-});
-
 // Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -75,32 +62,10 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: { 
-        secure: isHTTPS, // Set to true if using HTTPS (will be true in production/Coolify)
         httpOnly: true,
-        sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
-
-// Security headers
-app.use((req, res, next) => {
-    // HSTS - Force HTTPS for 1 year
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-    
-    // Prevent clickjacking
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    
-    // Prevent MIME type sniffing
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    
-    // Enable XSS protection
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    
-    // Referrer Policy
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    
-    next();
-});
 
 // Initialize database
 initDatabase()
