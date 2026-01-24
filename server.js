@@ -3,7 +3,17 @@ const bodyParser = require('body-parser');
 const path = require('path');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const { execSync } = require('child_process');
 require('dotenv').config();
+
+// Multer para upload de archivos
+const multer = require('multer');
+const uploadDir = path.join(__dirname, 'backups');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+const upload = multer({ dest: uploadDir });
 
 const { 
     initDatabase, 
@@ -868,6 +878,190 @@ app.get('/api/diagnostics/horas', async (req, res) => {
         
         res.json({
             status: result.tableExists ? 'ok' : 'missing',
+            horasTableExists: result.tableExists,
+            message: result.tableExists ? 'Tabla horas_trabajo existe' : 'Tabla horas_trabajo no existe',
+            error: result.error
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            status: 'error',
+            error: error.message 
+        });
+    }
+});
+
+// ========== BACKUP ENDPOINTS ==========
+
+// List all backups
+app.get('/api/backups', requireAuth, async (req, res) => {
+    try {
+        const backupDir = path.join(__dirname, 'backups');
+        if (!fs.existsSync(backupDir)) {
+            return res.json({ backups: [] });
+        }
+        
+        const files = fs.readdirSync(backupDir)
+            .filter(f => f.endsWith('.tar.gz'))
+            .sort()
+            .reverse();
+        
+        const backups = files.map(file => {
+            const filePath = path.join(backupDir, file);
+            const stats = fs.statSync(filePath);
+            const infoPath = path.join(backupDir, file.replace('.tar.gz', '_info.json'));
+            let info = {};
+            
+            if (fs.existsSync(infoPath)) {
+                try {
+                    info = JSON.parse(fs.readFileSync(infoPath, 'utf8'));
+                } catch (e) {}
+            }
+            
+            return {
+                name: file,
+                size: stats.size,
+                sizeReadable: (stats.size / 1024 / 1024).toFixed(2) + ' MB',
+                created: stats.mtime.toISOString(),
+                createdReadable: stats.mtime.toLocaleString('es-ES'),
+                info: info
+            };
+        });
+        
+        res.json({ backups });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create backup now
+app.post('/api/backups/create', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const backupScript = path.join(__dirname, 'backup.js');
+        if (!fs.existsSync(backupScript)) {
+            return res.status(404).json({ error: 'Script de backup no encontrado' });
+        }
+        
+        // Ejecutar script de backup
+        execSync(`node "${backupScript}"`, { cwd: __dirname });
+        
+        // Obtener el backup más reciente creado
+        const backupDir = path.join(__dirname, 'backups');
+        const files = fs.readdirSync(backupDir)
+            .filter(f => f.endsWith('.tar.gz'))
+            .sort()
+            .reverse();
+        
+        if (files.length === 0) {
+            return res.status(500).json({ error: 'Backup creado pero no encontrado' });
+        }
+        
+        const latestBackup = files[0];
+        const filePath = path.join(backupDir, latestBackup);
+        const stats = fs.statSync(filePath);
+        
+        res.json({
+            success: true,
+            message: 'Backup creado exitosamente',
+            backup: {
+                name: latestBackup,
+                size: stats.size,
+                sizeReadable: (stats.size / 1024 / 1024).toFixed(2) + ' MB',
+                created: stats.mtime.toISOString()
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al crear backup: ' + error.message });
+    }
+});
+
+// Download backup
+app.get('/api/backups/download/:filename', requireAuth, (req, res) => {
+    try {
+        const filename = req.params.filename;
+        // Validar que el filename no intente salir del directorio
+        if (filename.includes('..') || filename.includes('/')) {
+            return res.status(400).json({ error: 'Nombre de archivo inválido' });
+        }
+        
+        const filePath = path.join(__dirname, 'backups', filename);
+        
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'Backup no encontrado' });
+        }
+        
+        // Enviar archivo para descargar
+        res.download(filePath, filename, (err) => {
+            if (err) console.error('Error descargando:', err);
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Upload and restore backup
+app.post('/api/backups/restore', requireAuth, requireAdmin, upload.single('backupFile'), async (req, res) => {
+    try {
+        const file = req.file;
+        
+        if (!file) {
+            return res.status(400).json({ error: 'No se subió ningún archivo' });
+        }
+        
+        if (!file.originalname.endsWith('.tar.gz')) {
+            fs.unlinkSync(file.path);
+            return res.status(400).json({ error: 'El archivo debe ser .tar.gz' });
+        }
+        
+        const backupDir = path.join(__dirname, 'backups');
+        const finalPath = path.join(backupDir, file.originalname);
+        
+        // Mover archivo a directorio de backups
+        fs.renameSync(file.path, finalPath);
+        
+        // Ejecutar restauración
+        const restoreScript = path.join(__dirname, 'restore.js');
+        if (!fs.existsSync(restoreScript)) {
+            return res.status(404).json({ error: 'Script de restauración no encontrado' });
+        }
+        
+        // Para restore, sería más seguro que el usuario confirme manualmente
+        res.json({
+            success: true,
+            message: 'Archivo de backup subido correctamente. Para restaurar, ejecuta el comando en servidor.',
+            file: file.originalname,
+            path: finalPath,
+            instruction: 'Ejecutar en servidor: node restore.js'
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al procesar backup: ' + error.message });
+    }
+});
+
+// Delete backup
+app.delete('/api/backups/:filename', requireAuth, requireAdmin, (req, res) => {
+    try {
+        const filename = req.params.filename;
+        
+        if (filename.includes('..') || filename.includes('/')) {
+            return res.status(400).json({ error: 'Nombre de archivo inválido' });
+        }
+        
+        const filePath = path.join(__dirname, 'backups', filename);
+        
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'Backup no encontrado' });
+        }
+        
+        fs.unlinkSync(filePath);
+        
+        res.json({
+            success: true,
+            message: 'Backup eliminado exitosamente'
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
             horasTableExists: result.tableExists,
             message: result.tableExists ? 'Tabla horas_trabajo existe' : 'Tabla horas_trabajo NO existe - intentando crear...',
             error: result.error

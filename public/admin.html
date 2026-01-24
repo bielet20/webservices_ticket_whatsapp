@@ -736,6 +736,9 @@
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h1><i class="fas fa-tachometer-alt"></i> Panel de Administración de Tickets</h1>
                 <div style="display: flex; gap: 1rem; align-items: center;">
+                    <button onclick="toggleBackupsPanel()" class="header-btn">
+                        <i class="fas fa-database"></i> Backups
+                    </button>
                     <button onclick="toggleUsersPanel()" class="header-btn">
                         <i class="fas fa-users"></i> Usuarios
                     </button>
@@ -859,6 +862,43 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Backups Panel -->
+        <div class="users-panel" id="backupsPanel" style="display: none;">
+            <div class="users-header">
+                <div>
+                    <h2 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-database"></i> Gestión de Copias de Seguridad
+                    </h2>
+                </div>
+                <div>
+                    <button class="toggle-whatsapp" onclick="toggleBackupsPanel()">
+                        <i class="fas fa-times"></i> Cerrar
+                    </button>
+                </div>
+            </div>
+            <div class="users-content">
+                <div class="filter-actions" style="margin-bottom: 1.5rem; display: flex; gap: 1rem;">
+                    <button class="btn-primary" onclick="createBackupNow()">
+                        <i class="fas fa-plus"></i> Crear Backup Ahora
+                    </button>
+                    <button class="btn-secondary" onclick="document.getElementById('backupFileInput').click()">
+                        <i class="fas fa-upload"></i> Subir Backup
+                    </button>
+                    <input type="file" id="backupFileInput" accept=".tar.gz" style="display: none;" onchange="uploadBackup(event)">
+                </div>
+
+                <!-- Backups List -->
+                <div style="background: #f9fafb; padding: 1.5rem; border-radius: 8px;">
+                    <h3 style="margin-top: 0;">📦 Backups Disponibles</h3>
+                    <div id="backupsList" style="display: grid; gap: 1rem;">
+                        <div style="text-align: center; padding: 2rem; color: #6b7280;">
+                            <i class="fas fa-spinner fa-spin"></i> Cargando backups...
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -2093,7 +2133,140 @@
             }
         }
 
-        async function loadUsers() {
+        function toggleBackupsPanel() {
+            const panel = document.getElementById('backupsPanel');
+            const isVisible = panel.style.display !== 'none';
+            panel.style.display = isVisible ? 'none' : 'block';
+            
+            if (!isVisible) {
+                loadBackups();
+            }
+        }
+
+        async function loadBackups() {
+            try {
+                const response = await fetch('/api/backups');
+                const data = await response.json();
+                const backupsList = document.getElementById('backupsList');
+                
+                if (!data.backups || data.backups.length === 0) {
+                    backupsList.innerHTML = '<div style="text-align: center; padding: 2rem; color: #6b7280;">No hay backups disponibles</div>';
+                    return;
+                }
+                
+                backupsList.innerHTML = data.backups.map(backup => `
+                    <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; background: white;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <h4 style="margin: 0 0 0.5rem 0;">📦 ${backup.name}</h4>
+                                <p style="margin: 0 0 0.25rem 0; font-size: 0.875rem; color: #6b7280;">
+                                    <strong>Tamaño:</strong> ${backup.sizeReadable}
+                                </p>
+                                <p style="margin: 0; font-size: 0.875rem; color: #6b7280;">
+                                    <strong>Fecha:</strong> ${backup.createdReadable}
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button onclick="downloadBackup('${backup.name}')" class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                    <i class="fas fa-download"></i> Descargar
+                                </button>
+                                <button onclick="deleteBackup('${backup.name}')" class="btn-danger" style="padding: 0.5rem 1rem; font-size: 0.875rem; background: #ef4444; border: none; color: white; border-radius: 5px; cursor: pointer;">
+                                    <i class="fas fa-trash"></i> Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error cargando backups:', error);
+                document.getElementById('backupsList').innerHTML = '<div style="color: #ef4444;">Error al cargar backups</div>';
+            }
+        }
+
+        async function createBackupNow() {
+            if (!confirm('¿Crear una copia de seguridad ahora?')) return;
+            
+            try {
+                const btn = event.target;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando...';
+                
+                const response = await fetch('/api/backups/create', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Backup creado: ' + data.backup.name);
+                    loadBackups();
+                } else {
+                    alert('❌ Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                const btn = event.target;
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-plus"></i> Crear Backup Ahora';
+            }
+        }
+
+        function downloadBackup(filename) {
+            const link = document.createElement('a');
+            link.href = `/api/backups/download/${filename}`;
+            link.download = filename;
+            link.click();
+        }
+
+        async function deleteBackup(filename) {
+            if (!confirm(`¿Eliminar el backup ${filename}?`)) return;
+            
+            try {
+                const response = await fetch(`/api/backups/${filename}`, { method: 'DELETE' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Backup eliminado');
+                    loadBackups();
+                } else {
+                    alert('❌ Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function uploadBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.name.endsWith('.tar.gz')) {
+                alert('❌ El archivo debe ser .tar.gz');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('backupFile', file);
+            
+            try {
+                const response = await fetch('/api/backups/restore', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✅ Backup subido: ${file.name}\n\nPara restaurar, ejecuta en el servidor: node restore.js`);
+                    loadBackups();
+                } else {
+                    alert('❌ Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+            
+            // Limpiar input
+            document.getElementById('backupFileInput').value = '';
+        }
+
             try {
                 const response = await fetch('/api/usuarios');
                 const users = await response.json();
