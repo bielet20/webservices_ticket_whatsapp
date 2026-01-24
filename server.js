@@ -682,13 +682,24 @@ app.post('/api/setup/update-admin-password', async (req, res) => {
     try {
         const { currentPassword, newPassword, confirmPassword } = req.body;
         
-        // Validar contraseña actual
-        if (!currentPassword || currentPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) {
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            return res.status(400).json({ error: 'Todos los campos son requeridos' });
+        }
+        
+        // Obtener usuario admin
+        const adminUser = await getUserByUsername('admin');
+        if (!adminUser) {
+            return res.status(500).json({ error: 'Usuario admin no encontrado en la base de datos' });
+        }
+        
+        // Verificar contraseña actual
+        const isPasswordValid = await bcrypt.compare(currentPassword, adminUser.password_hash);
+        if (!isPasswordValid) {
             return res.status(401).json({ error: 'Contraseña actual incorrecta' });
         }
         
         // Validar nueva contraseña
-        if (!newPassword || newPassword.length < 6) {
+        if (newPassword.length < 6) {
             return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
         }
         
@@ -696,24 +707,24 @@ app.post('/api/setup/update-admin-password', async (req, res) => {
             return res.status(400).json({ error: 'Las contraseñas no coinciden' });
         }
         
-        // Actualizar contraseña en la base de datos
-        const adminUser = await getUserByUsername('admin');
-        if (!adminUser) {
-            return res.status(500).json({ error: 'Usuario admin no encontrado' });
-        }
-        
+        // Hashear nueva contraseña
         const saltRounds = 10;
         const passwordHash = await bcrypt.hash(newPassword, saltRounds);
         
-        await updateUser(adminUser.id, { password_hash: passwordHash });
+        // Actualizar en la base de datos
+        const result = await updateUser(adminUser.id, { password_hash: passwordHash });
         
-        res.json({ 
-            success: true, 
-            message: 'Contraseña del admin actualizada exitosamente'
-        });
+        if (result.changes > 0) {
+            res.json({ 
+                success: true, 
+                message: 'Contraseña del admin actualizada exitosamente'
+            });
+        } else {
+            res.status(500).json({ error: 'No se pudo actualizar la contraseña' });
+        }
     } catch (error) {
-        console.error('Error actualizando contraseña:', error);
-        res.status(500).json({ error: 'Error actualizando contraseña' });
+        console.error('Error actualizando contraseña admin:', error);
+        res.status(500).json({ error: 'Error interno: ' + error.message });
     }
 });
 
@@ -722,9 +733,20 @@ app.post('/api/setup/create-root-user', async (req, res) => {
     try {
         const { adminPassword, rootPassword } = req.body;
         
-        // Validar contraseña admin
-        if (!adminPassword || adminPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) {
-            return res.status(401).json({ error: 'Contraseña admin incorrecta' });
+        if (!adminPassword || !rootPassword) {
+            return res.status(400).json({ error: 'Todos los campos son requeridos' });
+        }
+        
+        // Obtener usuario admin para validar
+        const adminUser = await getUserByUsername('admin');
+        if (!adminUser) {
+            return res.status(500).json({ error: 'Usuario admin no encontrado' });
+        }
+        
+        // Verificar contraseña admin
+        const isPasswordValid = await bcrypt.compare(adminPassword, adminUser.password_hash);
+        if (!isPasswordValid) {
+            return res.status(401).json({ error: 'Contraseña del admin incorrecta' });
         }
         
         // Verificar si Root ya existe
@@ -734,7 +756,7 @@ app.post('/api/setup/create-root-user', async (req, res) => {
         }
         
         // Validar contraseña de Root
-        if (!rootPassword || rootPassword.length < 6) {
+        if (rootPassword.length < 6) {
             return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
         }
         
@@ -757,7 +779,7 @@ app.post('/api/setup/create-root-user', async (req, res) => {
         });
     } catch (error) {
         console.error('Error creando usuario Root:', error);
-        res.status(500).json({ error: 'Error creando usuario Root' });
+        res.status(500).json({ error: 'Error interno: ' + error.message });
     }
 });
 
