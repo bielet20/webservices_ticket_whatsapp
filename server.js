@@ -1062,18 +1062,6 @@ app.delete('/api/backups/:filename', requireAuth, requireAdmin, (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-            horasTableExists: result.tableExists,
-            message: result.tableExists ? 'Tabla horas_trabajo existe' : 'Tabla horas_trabajo NO existe - intentando crear...',
-            error: result.error
-        });
-    } catch (error) {
-        console.error('Error en diagnostics horas:', error);
-        res.status(500).json({ 
-            status: 'error',
-            message: error.message 
-        });
-    }
-});
 
 // Update production credentials (admin password)
 app.post('/api/setup/update-admin-password', async (req, res) => {
