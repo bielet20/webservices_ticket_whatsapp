@@ -909,6 +909,12 @@
                     <button class="btn-export" onclick="openCreateTicketModal()" style="background: #10b981;">
                         <i class="fas fa-plus"></i> Crear Nuevo Ticket
                     </button>
+                    <button class="btn-export" onclick="loadArchivedTickets(); document.querySelector('h2').textContent = 'Tickets Archivados'" style="background: #f59e0b;">
+                        <i class="fas fa-archive"></i> Ver Archivados
+                    </button>
+                    <button class="btn-export" onclick="loadTickets(); document.querySelector('h2').textContent = 'Lista de Tickets'" style="background: #3b82f6;">
+                        <i class="fas fa-list"></i> Ver Activos
+                    </button>
                     <button class="btn-export" onclick="exportToCSV()">
                         <i class="fas fa-download"></i> Exportar CSV
                     </button>
@@ -1149,6 +1155,97 @@
                     </div>
                 `;
             }
+        }
+
+        // Load archived tickets
+        async function loadArchivedTickets() {
+            try {
+                const response = await fetch('/api/tickets/archived/list');
+                
+                if (response.status === 401) {
+                    alert('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+                    window.location.href = '/login';
+                    return;
+                }
+                
+                if (response.status === 403) {
+                    alert('Solo administradores pueden ver tickets archivados');
+                    return;
+                }
+                
+                const archivedTickets = await response.json();
+                renderArchivedTickets(archivedTickets);
+            } catch (error) {
+                console.error('Error loading archived tickets:', error);
+                document.getElementById('ticketsTableContainer').innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Error al cargar los tickets archivados</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderArchivedTickets(tickets) {
+            const container = document.getElementById('ticketsTableContainer');
+            
+            if (tickets.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-archive"></i>
+                        <p>No hay tickets archivados</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const servicios = {
+                'reparacion': 'Reparación',
+                'redes': 'Redes',
+                'impresoras': 'Impresoras',
+                'seguridad': 'Seguridad',
+                'errores': 'Errores',
+                'soporte': 'Soporte'
+            };
+
+            const html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ticket ID</th>
+                            <th>Cliente</th>
+                            <th>Servicio</th>
+                            <th>Prioridad</th>
+                            <th>Estado</th>
+                            <th>Archivado Por</th>
+                            <th>Fecha Archivado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tickets.map(ticket => `
+                            <tr>
+                                <td><strong>${ticket.ticket_id}</strong></td>
+                                <td>${ticket.nombre}</td>
+                                <td>${servicios[ticket.servicio] || ticket.servicio}</td>
+                                <td><span class="badge badge-${ticket.prioridad}">${ticket.prioridad}</span></td>
+                                <td><span class="badge badge-${ticket.estado}">${ticket.estado.replace('_', ' ')}</span></td>
+                                <td>${ticket.usuario_archivado || '-'}</td>
+                                <td>${new Date(ticket.fecha_archivado).toLocaleString('es-ES')}</td>
+                                <td>
+                                    <div class="action-btns">
+                                        <button class="btn-small btn-restore" onclick="restoreTicket('${ticket.ticket_id}')" style="background: #10b981;">
+                                            <i class="fas fa-undo"></i> Restaurar
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = html;
         }
 
         function updateStatistics() {
@@ -1476,7 +1573,7 @@
 
         // Delete note
         async function deleteNoteFromTicket(noteId) {
-            if (!confirm('¿Está seguro que desea eliminar esta nota?')) {
+            if (!confirm('¿Está seguro que desea archivar esta nota? Se oculará pero podrá recuperarse.')) {
                 return;
             }
             
@@ -1488,17 +1585,19 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    alert('Nota eliminada exitosamente');
+                    alert('Nota archivada exitosamente');
                     // Reload the current ticket
                     const ticketId = document.querySelector('input[type="hidden"][id*="ticket"]')?.value;
                     if (ticketId) {
                         viewTicket(ticketId);
                     }
+                } else if (response.status === 403) {
+                    alert('Solo administradores pueden archivar notas');
                 } else {
                     alert('Error: ' + result.error);
                 }
             } catch (error) {
-                alert('Error al eliminar nota: ' + error.message);
+                alert('Error al archivar nota: ' + error.message);
             }
         }
 
@@ -1703,9 +1802,9 @@
             }
         }
 
-        // Delete ticket
+        // Archive ticket (soft delete)
         async function deleteTicket(ticketId) {
-            if (!confirm(`¿Está seguro que desea eliminar el ticket ${ticketId}? Esta acción no se puede deshacer.`)) {
+            if (!confirm(`¿Está seguro que desea archivar el ticket ${ticketId}? Se ocultará pero podrá recuperarse.`)) {
                 return;
             }
             
@@ -1717,13 +1816,35 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    alert('Ticket eliminado exitosamente');
+                    alert('Ticket archivado exitosamente');
                     loadTickets();
+                } else if (response.status === 403) {
+                    alert('Solo administradores pueden archivar tickets');
                 } else {
                     alert('Error: ' + result.error);
                 }
             } catch (error) {
-                alert('Error al eliminar ticket: ' + error.message);
+                alert('Error al archivar ticket: ' + error.message);
+            }
+        }
+
+        // Restore ticket from archive
+        async function restoreTicket(ticketId) {
+            try {
+                const response = await fetch(`/api/tickets/${ticketId}/restore`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('Ticket restaurado exitosamente');
+                    loadArchivedTickets();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error al restaurar ticket: ' + error.message);
             }
         }
 

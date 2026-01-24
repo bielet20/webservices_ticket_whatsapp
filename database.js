@@ -29,7 +29,10 @@ const initDatabase = () => {
                     descripcion TEXT NOT NULL,
                     estado TEXT DEFAULT 'pendiente',
                     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP
+                    fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    archivado INTEGER DEFAULT 0,
+                    fecha_archivado DATETIME,
+                    usuario_archivado TEXT
                 )
             `, (err) => {
                 if (err) {
@@ -38,6 +41,10 @@ const initDatabase = () => {
                 } else {
                     console.log('✓ Tabla de tickets creada/verificada');
                 }
+                // Add columns if they don't exist
+                db.run(`ALTER TABLE tickets ADD COLUMN archivado INTEGER DEFAULT 0`, () => {});
+                db.run(`ALTER TABLE tickets ADD COLUMN fecha_archivado DATETIME`, () => {});
+                db.run(`ALTER TABLE tickets ADD COLUMN usuario_archivado TEXT`, () => {});
             });
 
             // Create services table for reference
@@ -47,7 +54,10 @@ const initDatabase = () => {
                     codigo TEXT UNIQUE NOT NULL,
                     nombre TEXT NOT NULL,
                     descripcion TEXT,
-                    activo INTEGER DEFAULT 1
+                    activo INTEGER DEFAULT 1,
+                    archivado INTEGER DEFAULT 0,
+                    fecha_archivado DATETIME,
+                    usuario_archivado TEXT
                 )
             `, (err) => {
                 if (err) {
@@ -65,6 +75,9 @@ const initDatabase = () => {
                     nota TEXT NOT NULL,
                     autor TEXT NOT NULL,
                     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    archivado INTEGER DEFAULT 0,
+                    fecha_archivado DATETIME,
+                    usuario_archivado TEXT,
                     FOREIGN KEY (ticket_id) REFERENCES tickets(ticket_id)
                 )
             `, (err) => {
@@ -73,6 +86,10 @@ const initDatabase = () => {
                 } else {
                     console.log('✓ Tabla de notas creada/verificada');
                 }
+                // Add columns if they don't exist
+                db.run(`ALTER TABLE notas ADD COLUMN archivado INTEGER DEFAULT 0`, () => {});
+                db.run(`ALTER TABLE notas ADD COLUMN fecha_archivado DATETIME`, () => {});
+                db.run(`ALTER TABLE notas ADD COLUMN usuario_archivado TEXT`, () => {});
             });
 
             // Add columns for assignment if they don't exist
@@ -179,10 +196,24 @@ const createTicket = (ticketData) => {
     });
 };
 
-// Get all tickets
+// Get all tickets (no archived)
 const getAllTickets = () => {
     return new Promise((resolve, reject) => {
-        const sql = 'SELECT * FROM tickets ORDER BY fecha_creacion DESC';
+        const sql = 'SELECT * FROM tickets WHERE archivado = 0 ORDER BY fecha_creacion DESC';
+        db.all(sql, [], (err, rows) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(rows);
+            }
+        });
+    });
+};
+
+// Get all archived tickets
+const getArchivedTickets = () => {
+    return new Promise((resolve, reject) => {
+        const sql = 'SELECT * FROM tickets WHERE archivado = 1 ORDER BY fecha_archivado DESC';
         db.all(sql, [], (err, rows) => {
             if (err) {
                 reject(err);
@@ -244,7 +275,43 @@ const updateTicket = (ticketId, ticketData) => {
     });
 };
 
-// Delete ticket
+// Archive ticket (soft delete)
+const archiveTicket = (ticketId, usuario) => {
+    return new Promise((resolve, reject) => {
+        const sql = `
+            UPDATE tickets 
+            SET archivado = 1, fecha_archivado = CURRENT_TIMESTAMP, usuario_archivado = ?
+            WHERE ticket_id = ?
+        `;
+        db.run(sql, [usuario, ticketId], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
+
+// Restore archived ticket
+const restoreTicket = (ticketId) => {
+    return new Promise((resolve, reject) => {
+        const sql = `
+            UPDATE tickets 
+            SET archivado = 0, fecha_archivado = NULL, usuario_archivado = NULL
+            WHERE ticket_id = ?
+        `;
+        db.run(sql, [ticketId], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
+
+// Delete ticket (permanent - only after archive)
 const deleteTicket = (ticketId) => {
     return new Promise((resolve, reject) => {
         // First delete related notes
@@ -275,7 +342,7 @@ const deleteTicket = (ticketId) => {
 // Get tickets by status
 const getTicketsByStatus = (estado) => {
     return new Promise((resolve, reject) => {
-        const sql = 'SELECT * FROM tickets WHERE estado = ? ORDER BY fecha_creacion DESC';
+        const sql = 'SELECT * FROM tickets WHERE estado = ? AND archivado = 0 ORDER BY fecha_creacion DESC';
         db.all(sql, [estado], (err, rows) => {
             if (err) {
                 reject(err);
@@ -300,7 +367,43 @@ const addNoteToTicket = (ticketId, nota, autor) => {
     });
 };
 
-// Delete note
+// Archive note (soft delete)
+const archiveNote = (noteId, usuario) => {
+    return new Promise((resolve, reject) => {
+        const sql = `
+            UPDATE notas 
+            SET archivado = 1, fecha_archivado = CURRENT_TIMESTAMP, usuario_archivado = ?
+            WHERE id = ?
+        `;
+        db.run(sql, [usuario, noteId], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
+
+// Restore archived note
+const restoreNote = (noteId) => {
+    return new Promise((resolve, reject) => {
+        const sql = `
+            UPDATE notas 
+            SET archivado = 0, fecha_archivado = NULL, usuario_archivado = NULL
+            WHERE id = ?
+        `;
+        db.run(sql, [noteId], function(err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ changes: this.changes });
+            }
+        });
+    });
+};
+
+// Delete note (permanent)
 const deleteNote = (noteId) => {
     return new Promise((resolve, reject) => {
         const sql = 'DELETE FROM notas WHERE id = ?';
@@ -314,10 +417,10 @@ const deleteNote = (noteId) => {
     });
 };
 
-// Get notes for ticket
+// Get notes for ticket (no archived)
 const getTicketNotes = (ticketId) => {
     return new Promise((resolve, reject) => {
-        const sql = 'SELECT * FROM notas WHERE ticket_id = ? ORDER BY fecha_creacion DESC';
+        const sql = 'SELECT * FROM notas WHERE ticket_id = ? AND archivado = 0 ORDER BY fecha_creacion DESC';
         db.all(sql, [ticketId], (err, rows) => {
             if (err) {
                 reject(err);
@@ -545,12 +648,17 @@ module.exports = {
     initDatabase,
     createTicket,
     getAllTickets,
+    getArchivedTickets,
     getTicketById,
     updateTicketStatus,
     updateTicket,
+    archiveTicket,
+    restoreTicket,
     deleteTicket,
     getTicketsByStatus,
     addNoteToTicket,
+    archiveNote,
+    restoreNote,
     deleteNote,
     getTicketNotes,
     assignTechnician,

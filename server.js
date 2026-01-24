@@ -8,13 +8,18 @@ require('dotenv').config();
 const { 
     initDatabase, 
     createTicket, 
-    getAllTickets, 
+    getAllTickets,
+    getArchivedTickets,
     getTicketById,
     updateTicketStatus,
     updateTicket,
+    archiveTicket,
+    restoreTicket,
     deleteTicket,
     getTicketsByStatus,
     addNoteToTicket,
+    archiveNote,
+    restoreNote,
     deleteNote,
     getTicketNotes,
     assignTechnician,
@@ -84,6 +89,17 @@ const requireAuth = (req, res, next) => {
     
     // Si es una página, redirigir al login
     res.redirect('/login');
+};
+
+// Admin-only middleware
+const requireAdmin = (req, res, next) => {
+    if (req.session && req.session.authenticated && req.session.rol === 'admin') {
+        return next();
+    }
+    
+    return res.status(403).json({ 
+        error: 'Acceso denegado. Solo administradores pueden realizar esta acción.'
+    });
 };
 
 // API Routes
@@ -353,36 +369,84 @@ app.put('/api/tickets/:ticketId', requireAuth, async (req, res) => {
 });
 
 // Delete ticket (admin only)
-app.delete('/api/tickets/:ticketId', requireAuth, async (req, res) => {
+// Archive ticket (soft delete - admin only)
+app.delete('/api/tickets/:ticketId', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { ticketId } = req.params;
-        const result = await deleteTicket(ticketId);
+        const usuario = req.session.username;
+        const result = await archiveTicket(ticketId, usuario);
         
         if (result.changes > 0) {
-            res.json({ success: true, message: 'Ticket eliminado exitosamente' });
+            res.json({ success: true, message: 'Ticket archivado exitosamente' });
         } else {
             res.status(404).json({ error: 'Ticket no encontrado' });
         }
     } catch (error) {
-        console.error('Error al eliminar ticket:', error);
-        res.status(500).json({ error: 'Error al eliminar ticket' });
+        console.error('Error al archivar ticket:', error);
+        res.status(500).json({ error: 'Error al archivar ticket' });
     }
 });
 
-// Delete note
-app.delete('/api/notes/:noteId', requireAuth, async (req, res) => {
+// Restore archived ticket (admin only)
+app.post('/api/tickets/:ticketId/restore', requireAuth, requireAdmin, async (req, res) => {
     try {
-        const { noteId } = req.params;
-        const result = await deleteNote(noteId);
+        const { ticketId } = req.params;
+        const result = await restoreTicket(ticketId);
         
         if (result.changes > 0) {
-            res.json({ success: true, message: 'Nota eliminada exitosamente' });
+            res.json({ success: true, message: 'Ticket restaurado exitosamente' });
+        } else {
+            res.status(404).json({ error: 'Ticket no encontrado' });
+        }
+    } catch (error) {
+        console.error('Error al restaurar ticket:', error);
+        res.status(500).json({ error: 'Error al restaurar ticket' });
+    }
+});
+
+// Get archived tickets
+app.get('/api/tickets/archived/list', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const tickets = await getArchivedTickets();
+        res.json(tickets);
+    } catch (error) {
+        console.error('Error al obtener tickets archivados:', error);
+        res.status(500).json({ error: 'Error al obtener tickets archivados' });
+    }
+});
+
+// Archive note (soft delete - admin only)
+app.delete('/api/notes/:noteId', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { noteId } = req.params;
+        const usuario = req.session.username;
+        const result = await archiveNote(noteId, usuario);
+        
+        if (result.changes > 0) {
+            res.json({ success: true, message: 'Nota archivada exitosamente' });
         } else {
             res.status(404).json({ error: 'Nota no encontrada' });
         }
     } catch (error) {
-        console.error('Error al eliminar nota:', error);
-        res.status(500).json({ error: 'Error al eliminar nota' });
+        console.error('Error al archivar nota:', error);
+        res.status(500).json({ error: 'Error al archivar nota' });
+    }
+});
+
+// Restore archived note
+app.post('/api/notes/:noteId/restore', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { noteId } = req.params;
+        const result = await restoreNote(noteId);
+        
+        if (result.changes > 0) {
+            res.json({ success: true, message: 'Nota restaurada exitosamente' });
+        } else {
+            res.status(404).json({ error: 'Nota no encontrada' });
+        }
+    } catch (error) {
+        console.error('Error al restaurar nota:', error);
+        res.status(500).json({ error: 'Error al restaurar nota' });
     }
 });
 
