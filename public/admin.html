@@ -1407,15 +1407,17 @@
 
         async function viewTicket(ticketId) {
             try {
-                const [ticketResponse, notesResponse, whatsappResponse] = await Promise.all([
+                const [ticketResponse, notesResponse, whatsappResponse, horasResponse] = await Promise.all([
                     fetch(`/api/tickets/${ticketId}`),
                     fetch(`/api/tickets/${ticketId}/notes`),
-                    fetch(`/api/tickets/${ticketId}/whatsapp`)
+                    fetch(`/api/tickets/${ticketId}/whatsapp`),
+                    fetch(`/api/tickets/${ticketId}/horas`)
                 ]);
                 
                 const ticket = await ticketResponse.json();
                 const notes = await notesResponse.json();
                 const whatsappContacts = await whatsappResponse.json();
+                const horasData = await horasResponse.json();
                 
                 const servicios = {
                     'reparacion': 'Reparación de Equipos',
@@ -1442,6 +1444,28 @@
                         <div class="note-text">${note.nota}</div>
                     </div>
                 `).join('') : '<p style="color: #6b7280;">No hay notas aún</p>';
+
+                const horasHtml = horasData.horas && horasData.horas.length > 0 ? horasData.horas.map(hora => `
+                    <div class="hora-item">
+                        <div class="hora-header">
+                            <div>
+                                <strong>${hora.tecnico_nombre}</strong>
+                                <span>${hora.horas}h</span>
+                                <small>${new Date(hora.fecha_registro).toLocaleString('es-ES')}</small>
+                            </div>
+                            <button class="btn-delete-note" onclick="deleteHoraTrabajo(${hora.id}, '${ticket.ticket_id}')" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        ${hora.descripcion ? `<div class="nota-text">${hora.descripcion}</div>` : ''}
+                    </div>
+                `).join('') : '<p style="color: #6b7280;">Sin registros de horas</p>';
+                
+                const resumenHoras = horasData.porTecnico && horasData.porTecnico.length > 0 ? horasData.porTecnico.map(t => `
+                    <div style="padding: 0.5rem; background: #f3f4f6; border-radius: 4px; margin-bottom: 0.5rem;">
+                        <strong>${t.tecnico_nombre}:</strong> ${t.total_horas}h (${t.registros} registro${t.registros > 1 ? 's' : ''})
+                    </div>
+                `).join('') : '';
 
                 const whatsappHistoryHtml = whatsappContacts.length > 0 ? whatsappContacts.map(contact => `
                     <div class="whatsapp-contact-item">
@@ -1521,7 +1545,27 @@
                             <i class="fas fa-user-check"></i> Asignar Técnico
                         </button>
                     </div>
-
+                    
+                    <div class="notes-section">
+                        <h3><i class="fas fa-clock"></i> Horas de Trabajo</h3>
+                        ${resumenHoras ? `<div style="margin-bottom: 1rem; padding: 1rem; background: #f0fdf4; border-left: 4px solid #10b981; border-radius: 4px;">
+                            <strong>Total: ${horasData.total}h</strong>
+                            ${resumenHoras}
+                        </div>` : ''}
+                        <div style="max-height: 250px; overflow-y: auto; margin-top: 1rem;">
+                            ${horasHtml}
+                        </div>
+                        <div class="add-note-form">
+                            <input type="number" id="tecnicoId" placeholder="ID Usuario" min="0" step="1" style="width: 48%; margin-right: 4%;">
+                            <input type="text" id="tecnicoNombre" placeholder="Nombre del técnico" style="width: 48%;">
+                            <input type="number" id="horasTrabajadas" placeholder="Horas trabajadas" min="0.25" step="0.25" style="width: 100%;">
+                            <textarea id="descripcionHoras" placeholder="Descripción del trabajo realizado..." style="height: 60px;"></textarea>
+                            <button class="btn-add-note" onclick="addHorasTrabajo('${ticket.ticket_id}')">
+                                <i class="fas fa-plus"></i> Registrar Horas
+                            </button>
+                        </div>
+                    </div>
+                    
                     <div class="notes-section">
                         <h3><i class="fas fa-comment"></i> Notas Internas</h3>
                         <div style="max-height: 300px; overflow-y: auto; margin-top: 1rem;">
@@ -1641,6 +1685,73 @@
                 }
             } catch (error) {
                 alert('Error al archivar nota: ' + error.message);
+            }
+        }
+
+        // ==================== HORAS DE TRABAJO ====================
+
+        async function addHorasTrabajo(ticketId) {
+            const tecnicoId = document.getElementById('tecnicoId').value;
+            const tecnicoNombre = document.getElementById('tecnicoNombre').value;
+            const horas = parseFloat(document.getElementById('horasTrabajadas').value);
+            const descripcion = document.getElementById('descripcionHoras').value;
+            
+            if (!tecnicoId || !tecnicoNombre || !horas || horas <= 0) {
+                alert('Por favor completa todos los campos requeridos');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/tickets/${ticketId}/horas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        usuarioId: parseInt(tecnicoId),
+                        tecnicoNombre, 
+                        horas, 
+                        descripcion 
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('Horas registradas exitosamente');
+                    document.getElementById('tecnicoId').value = '';
+                    document.getElementById('tecnicoNombre').value = '';
+                    document.getElementById('horasTrabajadas').value = '';
+                    document.getElementById('descripcionHoras').value = '';
+                    viewTicket(ticketId);
+                } else {
+                    const result = await response.json();
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error registrando horas:', error);
+                alert('Error al registrar horas');
+            }
+        }
+
+        async function deleteHoraTrabajo(horaId, ticketId) {
+            if (!confirm('¿Está seguro que desea eliminar este registro de horas?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/tickets/horas/${horaId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('Registro de horas eliminado');
+                    viewTicket(ticketId);
+                } else if (response.status === 403) {
+                    alert('Solo administradores pueden eliminar registros de horas');
+                } else {
+                    const result = await response.json();
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error eliminando horas:', error);
+                alert('Error al eliminar horas');
             }
         }
 
