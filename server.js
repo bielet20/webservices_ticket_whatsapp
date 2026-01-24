@@ -65,10 +65,41 @@ app.use(session({
 initDatabase()
     .then(() => {
         console.log('✓ Base de datos inicializada correctamente');
+        // Auto-migrate admin credentials if needed
+        return autoMigrateAdminCredentials();
+    })
+    .then(() => {
+        console.log('✓ Migración de credenciales completada');
     })
     .catch(err => {
         console.error('Error al inicializar la base de datos:', err);
     });
+
+// Auto-migrate admin credentials: hash plaintext passwords
+const autoMigrateAdminCredentials = async () => {
+    try {
+        const adminUser = await getUserByUsername('admin');
+        if (!adminUser) {
+            console.log('⚠️  Usuario admin no encontrado, creando...');
+            const defaultHash = await bcrypt.hash('admin123', 10);
+            await createUser('admin', defaultHash, 'Administrador', 'admin@local', 'admin');
+            return;
+        }
+        
+        // Check if password is already hashed (bcrypt hashes start with $2a$ or $2b$)
+        if (!adminUser.password_hash.startsWith('$2')) {
+            console.log('🔐 Detectado: contraseña sin hashear. Migrando...');
+            const hashedPassword = await bcrypt.hash(adminUser.password_hash, 10);
+            await updateUser(adminUser.id, { password_hash: hashedPassword });
+            console.log('✓ Contraseña del admin migrada a formato seguro');
+        } else {
+            console.log('✓ Contraseña del admin ya está hasheada');
+        }
+    } catch (error) {
+        console.error('Error en auto-migración:', error);
+        // No throw - permite que el servidor siga iniciando
+    }
+};
 
 // WhatsApp simplificado: solo enlaces directos a web.whatsapp.com
 // Sin servidor de WhatsApp Web embebido para evitar problemas de Chromium en Docker
@@ -677,6 +708,36 @@ app.get('/api/session', (req, res) => {
     }
 });
 
+// Diagnostic endpoint for setup
+app.get('/api/setup/check', async (req, res) => {
+    try {
+        const adminUser = await getUserByUsername('admin');
+        
+        if (!adminUser) {
+            return res.json({
+                status: 'error',
+                message: 'Usuario admin no encontrado',
+                needsSetup: true
+            });
+        }
+        
+        const isHashed = adminUser.password_hash.startsWith('$2');
+        
+        res.json({
+            status: 'ok',
+            adminExists: true,
+            passwordHashed: isHashed,
+            message: isHashed ? 'Admin existe con contraseña hasheada' : 'Admin existe pero contraseña no está hasheada'
+        });
+    } catch (error) {
+        console.error('Error en setup check:', error);
+        res.status(500).json({ 
+            status: 'error',
+            message: error.message 
+        });
+    }
+});
+
 // Update production credentials (admin password)
 app.post('/api/setup/update-admin-password', async (req, res) => {
     try {
@@ -693,7 +754,17 @@ app.post('/api/setup/update-admin-password', async (req, res) => {
         }
         
         // Verificar contraseña actual
-        const isPasswordValid = await bcrypt.compare(currentPassword, adminUser.password_hash);
+        // Check if password is hashed or plaintext
+        let isPasswordValid = false;
+        
+        if (adminUser.password_hash.startsWith('$2')) {
+            // Password is hashed, use bcrypt
+            isPasswordValid = await bcrypt.compare(currentPassword, adminUser.password_hash);
+        } else {
+            // Password is plaintext (migration case), compare directly
+            isPasswordValid = currentPassword === adminUser.password_hash;
+        }
+        
         if (!isPasswordValid) {
             return res.status(401).json({ error: 'Contraseña actual incorrecta' });
         }
@@ -744,7 +815,17 @@ app.post('/api/setup/create-root-user', async (req, res) => {
         }
         
         // Verificar contraseña admin
-        const isPasswordValid = await bcrypt.compare(adminPassword, adminUser.password_hash);
+        // Check if password is hashed or plaintext
+        let isPasswordValid = false;
+        
+        if (adminUser.password_hash.startsWith('$2')) {
+            // Password is hashed, use bcrypt
+            isPasswordValid = await bcrypt.compare(adminPassword, adminUser.password_hash);
+        } else {
+            // Password is plaintext (migration case), compare directly
+            isPasswordValid = adminPassword === adminUser.password_hash;
+        }
+        
         if (!isPasswordValid) {
             return res.status(401).json({ error: 'Contraseña del admin incorrecta' });
         }
